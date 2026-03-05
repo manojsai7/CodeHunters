@@ -1,0 +1,229 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+}
+
+model Profile {
+  id              String        @id @default(uuid())
+  userId          String        @unique @map("user_id")
+  email           String        @unique
+  name            String
+  avatarUrl       String?       @map("avatar_url")
+  role            String        @default("student")
+  goldCoins       Int           @default(0) @map("gold_coins")
+  referralCode    String        @unique @map("referral_code")
+  studentVerified Boolean       @default(false) @map("student_verified")
+  studentEmail    String?       @map("student_email")
+  phone           String?
+  state           String?
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  referralsMade   ReferralUse[] @relation("Referrer")
+  purchases       Purchase[]
+  coupons         Coupon[]
+  progress        LessonProgress[]
+
+  @@map("profiles")
+}
+
+model Course {
+  id              String     @id @default(uuid())
+  slug            String     @unique
+  title           String
+  description     String     @db.Text
+  shortDesc       String?    @map("short_desc")
+  price           Int
+  mrp             Int
+  category        String
+  difficulty      String
+  thumbnail       String
+  previewVideoUrl String?    @map("preview_video_url")
+  instructorName  String     @default("Code Hunters Team") @map("instructor_name")
+  instructorBio   String?    @map("instructor_bio") @db.Text
+  instructorAvatar String?   @map("instructor_avatar")
+  purchasesCount  Int        @default(0) @map("purchases_count")
+  rating          Float      @default(0)
+  reviewCount     Int        @default(0) @map("review_count")
+  isPublished     Boolean    @default(false) @map("is_published")
+  isBestseller    Boolean    @default(false) @map("is_bestseller")
+  techTags        String[]   @map("tech_tags")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  lessons         Lesson[]
+  purchases       Purchase[]
+  reviews         Review[]
+
+  @@map("courses")
+}
+
+model Lesson {
+  id        String   @id @default(uuid())
+  courseId   String   @map("course_id")
+  title     String
+  videoUrl  String   @map("video_url")
+  duration  Int      @default(0)
+  order     Int
+  isFree    Boolean  @default(false) @map("is_free")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  progress  LessonProgress[]
+
+  @@map("lessons")
+}
+
+model LessonProgress {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  lessonId  String   @map("lesson_id")
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  profile   Profile  @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@map("lesson_progress")
+}
+
+model Project {
+  id              String    @id @default(uuid())
+  slug            String    @unique
+  title           String
+  description     String    @db.Text
+  shortDesc       String?   @map("short_desc")
+  price           Int
+  mrp             Int
+  zipUrl          String    @map("zip_url")
+  thumbnail       String?
+  previewImages   String[]  @map("preview_images")
+  techTags        String[]  @map("tech_tags")
+  category        String    @default("web")
+  difficulty      String    @default("intermediate")
+  purchasesCount  Int       @default(0) @map("purchases_count")
+  rating          Float     @default(0)
+  reviewCount     Int       @default(0) @map("review_count")
+  isPublished     Boolean   @default(false) @map("is_published")
+  isBestseller    Boolean   @default(false) @map("is_bestseller")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  purchases       Purchase[]
+
+  @@map("projects")
+}
+
+model Purchase {
+  id                  String   @id @default(uuid())
+  userId              String?  @map("user_id")
+  courseId             String?  @map("course_id")
+  projectId           String?  @map("project_id")
+  amount              Int
+  originalAmount      Int      @map("original_amount")
+  discountApplied     Int      @default(0) @map("discount_applied")
+  isStudentDiscount   Boolean  @default(false) @map("is_student_discount")
+  referralDiscount    Boolean  @default(false) @map("referral_discount")
+  couponCode          String?  @map("coupon_code")
+  razorpayOrderId     String   @unique @map("razorpay_order_id")
+  razorpayPaymentId   String?  @map("razorpay_payment_id")
+  status              String   @default("pending")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  profile             Profile? @relation(fields: [userId], references: [userId])
+  course              Course?  @relation(fields: [courseId], references: [id])
+  project             Project? @relation(fields: [projectId], references: [id])
+
+  @@map("purchases")
+}
+
+model GuestPurchase {
+  id                  String    @id @default(uuid())
+  name                String
+  email               String
+  phone               String
+  state               String
+  selfDeclaredStudent Boolean   @default(false) @map("self_declared_student")
+  emailTrustLevel     String    @map("email_trust_level")
+  emailVerified       Boolean   @default(false) @map("email_verified")
+  verificationSentAt  DateTime? @map("verification_sent_at")
+  productId           String    @map("product_id")
+  productType         String    @map("product_type")
+  amount              Int
+  discountApplied     Int       @default(0) @map("discount_applied")
+  razorpayOrderId     String    @unique @map("razorpay_order_id")
+  razorpayPaymentId   String?   @map("razorpay_payment_id")
+  referralCodeUsed    String?   @map("referral_code_used")
+  referralEligible    Boolean   @default(false) @map("referral_eligible")
+  status              String    @default("pending")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  @@map("guest_purchases")
+}
+
+model ReferralUse {
+  id             String   @id @default(uuid())
+  referrerId     String   @map("referrer_id")
+  referredUserId String   @unique @map("referred_user_id")
+  referredName   String   @map("referred_name")
+  purchaseMade   Boolean  @default(false) @map("purchase_made")
+  coinsAwarded   Boolean  @default(false) @map("coins_awarded")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  referrer       Profile  @relation("Referrer", fields: [referrerId], references: [userId])
+
+  @@map("referral_uses")
+}
+
+model Coupon {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  discount   Int
+  type       String   @default("percent")
+  expiresAt  DateTime @map("expires_at")
+  usageLimit Int      @map("usage_limit")
+  usedCount  Int      @default(0) @map("used_count")
+  userId     String?  @map("user_id")
+  source     String   @default("manual")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  profile    Profile? @relation(fields: [userId], references: [userId])
+
+  @@map("coupons")
+}
+
+model PreCheckoutLead {
+  id                  String   @id @default(uuid())
+  name                String
+  email               String
+  phone               String
+  state               String?
+  selfDeclaredStudent Boolean  @default(false) @map("self_declared_student")
+  hearAboutUs         String?  @map("hear_about_us")
+  productId           String   @map("product_id")
+  productType         String   @map("product_type")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@map("pre_checkout_leads")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  courseId   String   @map("course_id")
+  rating    Int
+  comment   String?  @db.Text
+  userName  String   @map("user_name")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@map("reviews")
+}
