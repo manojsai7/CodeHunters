@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Code2, Coins } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -124,8 +125,15 @@ export function Navbar({ user }: NavbarProps) {
       </nav>
 
       {/* Mobile Menu */}
+      <AnimatePresence>
       {isOpen && (
-        <div className="border-t border-border/50 bg-background/95 backdrop-blur-xl md:hidden">
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.25, ease: "easeInOut" }}
+          className="overflow-hidden border-t border-border/50 bg-background/95 backdrop-blur-xl md:hidden"
+        >
           <div className="space-y-1 px-4 pb-4 pt-2">
             <Link
               href="/courses"
@@ -199,8 +207,9 @@ export function Navbar({ user }: NavbarProps) {
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </header>
   );
 }

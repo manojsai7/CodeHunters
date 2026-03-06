@@ -11,10 +11,14 @@ export const metadata = {
 };
 
 export default async function LoginPage() {
-  const user = await getUser();
-
-  if (user) {
-    redirect("/dashboard");
+  try {
+    const user = await getUser();
+    if (user) {
+      redirect("/dashboard");
+    }
+  } catch (e: unknown) {
+    if (e && typeof e === 'object' && 'digest' in e) throw e;
+    // Supabase not configured — show login form anyway
   }
 
   return <LoginForm />;

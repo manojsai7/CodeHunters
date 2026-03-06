@@ -60,8 +60,12 @@ export default function FeaturedCourses() {
   const inView = useInView(ref, { once: true, margin: "-80px" });
 
   return (
-    <section className="relative bg-background py-24 lg:py-32">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <section className="relative bg-background py-24 lg:py-32 overflow-hidden">
+      {/* Decorative blurs */}
+      <div className="pointer-events-none absolute -right-40 top-20 h-[400px] w-[400px] rounded-full bg-primary/5 blur-[100px]" />
+      <div className="pointer-events-none absolute -left-40 bottom-20 h-[300px] w-[300px] rounded-full bg-secondary/5 blur-[100px]" />
+
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Heading */}
         <motion.div
           ref={ref}
@@ -73,7 +77,7 @@ export default function FeaturedCourses() {
           <h2 className="text-3xl font-bold md:text-5xl">
             Featured <span className="text-primary">Courses</span>
           </h2>
-          <div className="mx-auto mt-3 h-1 w-20 rounded-full bg-primary" />
+          <div className="mx-auto mt-3 h-1 w-20 rounded-full bg-gradient-to-r from-primary to-secondary" />
           <p className="mt-5 text-muted md:text-lg">
             Industry-grade courses designed to make you job-ready, not just
             tutorial-ready.

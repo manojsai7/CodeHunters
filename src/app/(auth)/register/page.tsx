@@ -15,10 +15,14 @@ interface RegisterPageProps {
 }
 
 export default async function RegisterPage({ searchParams }: RegisterPageProps) {
-  const user = await getUser();
-
-  if (user) {
-    redirect("/dashboard");
+  try {
+    const user = await getUser();
+    if (user) {
+      redirect("/dashboard");
+    }
+  } catch (e: unknown) {
+    if (e && typeof e === 'object' && 'digest' in e) throw e;
+    // Supabase not configured — show register form anyway
   }
 
   return <RegisterForm referralCode={searchParams.ref} />;

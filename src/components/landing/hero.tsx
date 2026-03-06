@@ -36,8 +36,9 @@ export default function Hero() {
     <section className="relative min-h-screen overflow-hidden bg-background">
       {/* Gradient mesh background */}
       <div className="gradient-mesh absolute inset-0 pointer-events-none" />
-      <div className="absolute top-20 left-1/4 h-72 w-72 rounded-full bg-primary/5 blur-3xl" />
-      <div className="absolute bottom-20 right-1/4 h-64 w-64 rounded-full bg-secondary/5 blur-3xl" />
+      <div className="absolute top-20 left-1/4 h-72 w-72 rounded-full bg-primary/10 blur-3xl animate-float" />
+      <div className="absolute bottom-20 right-1/4 h-64 w-64 rounded-full bg-secondary/10 blur-3xl animate-float [animation-delay:1.5s]" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[500px] w-[500px] rounded-full bg-primary/5 blur-[120px] animate-pulse pointer-events-none" />
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-28 pb-20 lg:pt-36 lg:pb-28">
         <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
@@ -150,7 +151,7 @@ export default function Hero() {
                 hidden: { opacity: 0, y: 20 },
                 visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
               }}
-              className="glass flex flex-col items-center gap-2 rounded-xl px-6 py-5 text-center"
+              className="glass flex flex-col items-center gap-2 rounded-xl px-6 py-5 text-center hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 cursor-default"
             >
               <stat.icon className="h-6 w-6 text-primary" />
               <span className="text-2xl font-bold md:text-3xl">{stat.value}</span>

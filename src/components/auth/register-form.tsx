@@ -29,9 +29,10 @@ interface RegisterFormProps {
 
 export function RegisterForm({ referralCode }: RegisterFormProps) {
   const router = useRouter();
-  const supabase = createClient();
   const [isLoading, setIsLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
+
+  const getSupabase = () => createClient();
 
   const {
     register,
@@ -47,7 +48,7 @@ export function RegisterForm({ referralCode }: RegisterFormProps) {
   const onSubmit = async (data: RegisterFormData) => {
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      const { error } = await getSupabase().auth.signUp({
         email: data.email,
         password: data.password,
         options: {
@@ -75,7 +76,7 @@ export function RegisterForm({ referralCode }: RegisterFormProps) {
   const handleOAuth = async (provider: "google" | "github") => {
     setOauthLoading(provider);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { error } = await getSupabase().auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
@@ -106,7 +107,7 @@ export function RegisterForm({ referralCode }: RegisterFormProps) {
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="relative z-10 w-full max-w-md"
       >
-        <Card className="border-white/10 bg-surface/50 backdrop-blur-xl">
+        <Card className="border-white/[0.08] bg-surface/50 backdrop-blur-xl shadow-2xl shadow-primary/5">
           <CardHeader className="items-center text-center">
             {/* Logo */}
             <Link href="/" className="mb-2 flex items-center gap-2">

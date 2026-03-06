@@ -64,7 +64,7 @@ export default function PopularProjects() {
           <h2 className="text-3xl font-bold md:text-5xl">
             Popular <span className="text-secondary">Projects</span>
           </h2>
-          <div className="mx-auto mt-3 h-1 w-20 rounded-full bg-secondary" />
+          <div className="mx-auto mt-3 h-1 w-20 rounded-full bg-gradient-to-r from-secondary to-primary" />
           <p className="mt-5 text-muted md:text-lg">
             Production-level source code you can learn from, customize, and ship.
           </p>
@@ -83,10 +83,10 @@ export default function PopularProjects() {
               <Card className="card-hover group relative flex h-full flex-col overflow-hidden">
                 {/* Thumbnail */}
                 <div
-                  className={`relative h-40 w-full bg-gradient-to-br ${project.gradient} bg-surface`}
+                  className={`relative h-40 w-full bg-gradient-to-br ${project.gradient} bg-surface transition-all duration-500 group-hover:saturate-150`}
                 >
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <FolderGit2 className="h-12 w-12 text-white/20" />
+                    <FolderGit2 className="h-12 w-12 text-white/20 transition-transform duration-500 group-hover:scale-110" />
                   </div>
                   <Badge
                     variant="outline"
