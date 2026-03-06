@@ -11,11 +11,12 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminLeadsPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams: { search?: string };
+  searchParams: Promise<{ search?: string }>;
 }) {
   try {
+  const searchParams = await searchParamsPromise;
   const search = searchParams.search || "";
 
   const leads = await prisma.preCheckoutLead.findMany({

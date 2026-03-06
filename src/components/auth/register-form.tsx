@@ -69,10 +69,14 @@ export function RegisterForm({ referralCode }: RegisterFormProps) {
   const handleOAuth = async (provider: "google" | "github") => {
     setOauthLoading(provider);
     try {
+      const redirectUrl = new URL("/auth/callback", window.location.origin);
+      if (referralCode) {
+        redirectUrl.searchParams.set("ref", referralCode);
+      }
       const { error } = await getSupabase().auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: redirectUrl.toString(),
         },
       });
 

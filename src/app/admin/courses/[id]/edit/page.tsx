@@ -7,10 +7,11 @@ export const metadata = {
 };
 
 export default async function EditCoursePage({
-  params,
+  params: paramsPromise,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const params = await paramsPromise;
   try {
   const course = await prisma.course.findUnique({
     where: { id: params.id },

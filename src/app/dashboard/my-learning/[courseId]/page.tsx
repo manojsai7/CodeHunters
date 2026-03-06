@@ -6,10 +6,11 @@ import { CoursePlayerClient } from "@/components/dashboard/course-player-client"
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({
-  params,
+  params: paramsPromise,
 }: {
-  params: { courseId: string };
+  params: Promise<{ courseId: string }>;
 }) {
+  const params = await paramsPromise;
   try {
     const course = await prisma.course.findUnique({
       where: { id: params.courseId },
@@ -24,10 +25,11 @@ export async function generateMetadata({
 }
 
 export default async function CoursePlayerPage({
-  params,
+  params: paramsPromise,
 }: {
-  params: { courseId: string };
+  params: Promise<{ courseId: string }>;
 }) {
+  const params = await paramsPromise;
   try {
   const user = await getUser();
   if (!user) redirect("/login");

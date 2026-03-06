@@ -8,7 +8,7 @@ import { CourseCard } from "@/components/courses/course-card";
 import { getUser } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 
-export const revalidate = 60;
+export const revalidate = 30;
 
 type CourseItem = Awaited<ReturnType<typeof prisma.course.findMany>>[number];
 
@@ -24,15 +24,16 @@ export const metadata: Metadata = {
 };
 
 interface PageProps {
-  searchParams: {
+  searchParams: Promise<{
     category?: string;
     difficulty?: string;
     search?: string;
     sort?: string;
-  };
+  }>;
 }
 
-export default async function CoursesPage({ searchParams }: PageProps) {
+export default async function CoursesPage({ searchParams: searchParamsPromise }: PageProps) {
+  const searchParams = await searchParamsPromise;
   // Auth
   let userData = null;
   try {
@@ -90,7 +91,26 @@ export default async function CoursesPage({ searchParams }: PageProps) {
     courses = await prisma.course.findMany({
       where,
       orderBy,
-    });
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        description: true,
+        shortDesc: true,
+        price: true,
+        mrp: true,
+        thumbnail: true,
+        category: true,
+        difficulty: true,
+        techTags: true,
+        purchasesCount: true,
+        rating: true,
+        reviewCount: true,
+        isBestseller: true,
+        instructorName: true,
+        previewVideoUrl: true,
+      },
+    }) as CourseItem[];
   } catch {
     // Database unavailable — render with empty list
   }

@@ -11,11 +11,12 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminUsersPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams: { search?: string };
+  searchParams: Promise<{ search?: string }>;
 }) {
   try {
+  const searchParams = await searchParamsPromise;
   const search = searchParams.search || "";
 
   const users = await prisma.profile.findMany({

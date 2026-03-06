@@ -7,7 +7,7 @@ import { ProjectCard } from "@/components/projects/project-card";
 import { getUser } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 
-export const revalidate = 60;
+export const revalidate = 30;
 
 type ProjectItem = Awaited<ReturnType<typeof prisma.project.findMany>>[number];
 
@@ -23,15 +23,16 @@ export const metadata: Metadata = {
 };
 
 interface PageProps {
-  searchParams: {
+  searchParams: Promise<{
     category?: string;
     difficulty?: string;
     search?: string;
     sort?: string;
-  };
+  }>;
 }
 
-export default async function ProjectsPage({ searchParams }: PageProps) {
+export default async function ProjectsPage({ searchParams: searchParamsPromise }: PageProps) {
+  const searchParams = await searchParamsPromise;
   // Auth
   let userData = null;
   try {
@@ -89,7 +90,24 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
     projects = await prisma.project.findMany({
       where,
       orderBy,
-    });
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        description: true,
+        shortDesc: true,
+        price: true,
+        mrp: true,
+        thumbnail: true,
+        category: true,
+        difficulty: true,
+        techTags: true,
+        purchasesCount: true,
+        rating: true,
+        reviewCount: true,
+        isBestseller: true,
+      },
+    }) as ProjectItem[];
   } catch {
     // Database unavailable — render with empty list
   }

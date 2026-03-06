@@ -126,7 +126,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
                   required: "Name is required",
                   minLength: { value: 2, message: "Name too short" },
                 })}
-                placeholder="John Doe"
+                placeholder="Your full name"
                 error={errors.name?.message}
               />
             </div>

@@ -7,10 +7,11 @@ export const metadata = {
 };
 
 export default async function EditProjectPage({
-  params,
+  params: paramsPromise,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const params = await paramsPromise;
   try {
   const project = await prisma.project.findUnique({
     where: { id: params.id },

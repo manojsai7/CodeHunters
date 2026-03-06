@@ -12,10 +12,11 @@ export const metadata: Metadata = {
 };
 
 export default async function PaymentSuccessPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams: { orderId?: string };
+  searchParams: Promise<{ orderId?: string }>;
 }) {
+  const searchParams = await searchParamsPromise;
   const orderId = searchParams.orderId;
   let purchase = null;
 

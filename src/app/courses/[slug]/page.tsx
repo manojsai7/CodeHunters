@@ -38,12 +38,13 @@ type ReviewItem = NonNullable<CourseWithRelations>["reviews"][number];
 type CourseItem = Awaited<ReturnType<typeof prisma.course.findMany>>[number];
 
 interface PageProps {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 export async function generateMetadata({
-  params,
+  params: paramsPromise,
 }: PageProps): Promise<Metadata> {
+  const params = await paramsPromise;
   try {
     const course = await prisma.course.findUnique({
       where: { slug: params.slug },
@@ -76,7 +77,8 @@ function formatTotalDuration(seconds: number) {
   return `${h}h ${m}m`;
 }
 
-export default async function CourseDetailPage({ params }: PageProps) {
+export default async function CourseDetailPage({ params: paramsPromise }: PageProps) {
+  const params = await paramsPromise;
   let course;
   try {
     course = await prisma.course.findUnique({

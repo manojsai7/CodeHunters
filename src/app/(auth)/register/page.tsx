@@ -11,10 +11,11 @@ export const metadata = {
 };
 
 interface RegisterPageProps {
-  searchParams: { ref?: string };
+  searchParams: Promise<{ ref?: string }>;
 }
 
-export default async function RegisterPage({ searchParams }: RegisterPageProps) {
+export default async function RegisterPage({ searchParams: searchParamsPromise }: RegisterPageProps) {
+  const searchParams = await searchParamsPromise;
   try {
     const user = await getUser();
     if (user) {

@@ -29,12 +29,13 @@ export const dynamic = 'force-dynamic';
 type ProjectItem = Awaited<ReturnType<typeof prisma.project.findMany>>[number];
 
 interface PageProps {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 export async function generateMetadata({
-  params,
+  params: paramsPromise,
 }: PageProps): Promise<Metadata> {
+  const params = await paramsPromise;
   try {
     const project = await prisma.project.findUnique({
       where: { slug: params.slug },
@@ -58,7 +59,8 @@ export async function generateMetadata({
   }
 }
 
-export default async function ProjectDetailPage({ params }: PageProps) {
+export default async function ProjectDetailPage({ params: paramsPromise }: PageProps) {
+  const params = await paramsPromise;
   let project;
   try {
     project = await prisma.project.findUnique({

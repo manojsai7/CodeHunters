@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUser } from "@/lib/supabase/server";
 
-type RouteContext = { params: { id: string } };
+type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PUT(
   request: NextRequest,
   { params }: RouteContext
 ) {
-  const { id } = params;
+  const { id } = await params;
   try {
     const user = await getUser();
     if (!user) {
@@ -57,7 +57,7 @@ export async function DELETE(
   _request: NextRequest,
   { params }: RouteContext
 ) {
-  const { id } = params;
+  const { id } = await params;
   try {
     const user = await getUser();
     if (!user) {
