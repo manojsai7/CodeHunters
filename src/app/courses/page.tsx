@@ -8,7 +8,7 @@ import { CourseCard } from "@/components/courses/course-card";
 import { getUser } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 type CourseItem = Awaited<ReturnType<typeof prisma.course.findMany>>[number];
 
@@ -96,25 +96,18 @@ export default async function CoursesPage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="relative min-h-screen bg-background">
-      {/* Background accents */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 right-0 h-[500px] w-[500px] rounded-full bg-primary/5 blur-[120px]" />
-        <div className="absolute top-1/2 -left-40 h-[400px] w-[400px] rounded-full bg-secondary/5 blur-[120px]" />
-      </div>
-
+    <div className="min-h-screen bg-background">
       <Navbar user={userData} />
 
       <main className="relative mx-auto max-w-7xl px-4 pb-20 pt-24 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white sm:text-4xl">
-            Explore <span className="text-gradient">Courses</span>
+            Explore <span className="text-accent">Courses</span>
           </h1>
           <p className="mt-2 text-muted">
             Learn from industry experts and build real-world applications
           </p>
-          <div className="mt-4 h-1 w-20 rounded-full bg-gradient-to-r from-primary to-secondary" />
         </div>
 
         {/* Filters */}

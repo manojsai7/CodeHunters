@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,13 @@ export function Navbar({ user }: NavbarProps) {
       <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
+          <Image
+            src="/logo.png"
+            alt="Code Hunters"
+            width={36}
+            height={36}
+            className="rounded-lg"
+          />
           <span className="text-xl font-bold font-display tracking-tight text-white">
             Code Hunters
           </span>

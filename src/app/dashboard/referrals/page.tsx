@@ -42,7 +42,7 @@ export default async function ReferralsPage() {
 
   // Check for auto-generated coupons owned by this user
   const coupons = await prisma.coupon.findMany({
-    where: { userId: user.id, isActive: true, source: "referral" },
+    where: { userId: user.id, isActive: true, source: "referral_reward" },
     orderBy: { createdAt: "desc" },
   });
 

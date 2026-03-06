@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
@@ -65,12 +66,13 @@ export function CoursesTable({ data }: { data: CourseRow[] }) {
       label: "Image",
       className: "w-16",
       render: (row) => (
-        <div className="h-10 w-16 overflow-hidden rounded-md bg-surface-hover">
+        <div className="relative h-10 w-16 overflow-hidden rounded-md bg-surface-hover">
           {row.thumbnail && (
-            <img
+            <Image
               src={row.thumbnail}
               alt=""
-              className="h-full w-full object-cover"
+              fill
+              className="object-cover"
             />
           )}
         </div>

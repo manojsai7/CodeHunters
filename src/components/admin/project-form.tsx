@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -336,10 +337,11 @@ export function ProjectForm({ project }: ProjectFormProps) {
                   key={url}
                   className="relative group rounded-lg overflow-hidden border border-border bg-surface-hover aspect-video"
                 >
-                  <img
+                  <Image
                     src={url}
                     alt=""
-                    className="h-full w-full object-cover"
+                    fill
+                    className="object-cover"
                   />
                   <button
                     type="button"

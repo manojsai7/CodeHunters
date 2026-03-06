@@ -27,6 +27,11 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
+  icons: {
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
+  },
   title: {
     default: "Code Hunters — Hunt the Skills. Build the Future.",
     template: "%s | Code Hunters",

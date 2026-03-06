@@ -9,6 +9,7 @@ export async function GET(
   _request: NextRequest,
   { params }: RouteContext
 ) {
+  const { id } = params;
   try {
     const user = await getUser();
     if (!user) {
@@ -22,7 +23,7 @@ export async function GET(
     }
 
     const course = await prisma.course.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         lessons: { orderBy: { order: "asc" } },
         _count: { select: { purchases: true, reviews: true } },
@@ -47,6 +48,7 @@ export async function PUT(
   request: NextRequest,
   { params }: RouteContext
 ) {
+  const { id } = params;
   try {
     const user = await getUser();
     if (!user) {
@@ -60,7 +62,7 @@ export async function PUT(
     }
 
     const existing = await prisma.course.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existing) {
@@ -91,7 +93,7 @@ export async function PUT(
     }
 
     const updated = await prisma.course.update({
-      where: { id: params.id },
+      where: { id },
       data: parsed.data,
     });
 
@@ -109,6 +111,7 @@ export async function DELETE(
   _request: NextRequest,
   { params }: RouteContext
 ) {
+  const { id } = params;
   try {
     const user = await getUser();
     if (!user) {
@@ -122,7 +125,7 @@ export async function DELETE(
     }
 
     const existing = await prisma.course.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existing) {
@@ -131,7 +134,7 @@ export async function DELETE(
 
     // Soft delete: unpublish the course
     await prisma.course.update({
-      where: { id: params.id },
+      where: { id },
       data: { isPublished: false },
     });
 

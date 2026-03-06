@@ -8,6 +8,7 @@ export async function PUT(
   request: NextRequest,
   { params }: RouteContext
 ) {
+  const { id } = params;
   try {
     const user = await getUser();
     if (!user) {
@@ -21,7 +22,7 @@ export async function PUT(
     }
 
     const existing = await prisma.coupon.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existing) {
@@ -38,7 +39,7 @@ export async function PUT(
     if (body.expiresAt) updateData.expiresAt = new Date(body.expiresAt);
 
     const updated = await prisma.coupon.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
     });
 
@@ -56,6 +57,7 @@ export async function DELETE(
   _request: NextRequest,
   { params }: RouteContext
 ) {
+  const { id } = params;
   try {
     const user = await getUser();
     if (!user) {
@@ -69,7 +71,7 @@ export async function DELETE(
     }
 
     const existing = await prisma.coupon.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existing) {
@@ -78,7 +80,7 @@ export async function DELETE(
 
     // Deactivate rather than hard delete
     await prisma.coupon.update({
-      where: { id: params.id },
+      where: { id },
       data: { isActive: false },
     });
 

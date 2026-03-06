@@ -9,6 +9,7 @@ export async function GET(
   _request: NextRequest,
   { params }: RouteContext
 ) {
+  const { id } = params;
   try {
     const user = await getUser();
     if (!user) {
@@ -22,7 +23,7 @@ export async function GET(
     }
 
     const project = await prisma.project.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         _count: { select: { purchases: true } },
       },
@@ -46,6 +47,7 @@ export async function PUT(
   request: NextRequest,
   { params }: RouteContext
 ) {
+  const { id } = params;
   try {
     const user = await getUser();
     if (!user) {
@@ -59,7 +61,7 @@ export async function PUT(
     }
 
     const existing = await prisma.project.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existing) {
@@ -90,7 +92,7 @@ export async function PUT(
     }
 
     const updated = await prisma.project.update({
-      where: { id: params.id },
+      where: { id },
       data: parsed.data,
     });
 
@@ -108,6 +110,7 @@ export async function DELETE(
   _request: NextRequest,
   { params }: RouteContext
 ) {
+  const { id } = params;
   try {
     const user = await getUser();
     if (!user) {
@@ -121,7 +124,7 @@ export async function DELETE(
     }
 
     const existing = await prisma.project.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existing) {
@@ -130,7 +133,7 @@ export async function DELETE(
 
     // Soft delete: unpublish the project
     await prisma.project.update({
-      where: { id: params.id },
+      where: { id },
       data: { isPublished: false },
     });
 
