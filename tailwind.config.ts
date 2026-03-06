@@ -10,27 +10,32 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "#0F0F0F",
+        background: "#000000",
         foreground: "#FFFFFF",
-        primary: "#FF6B35",
-        "primary-hover": "#E85A25",
-        secondary: "#00D4FF",
-        surface: "#1A1A2E",
-        "surface-hover": "#242440",
-        muted: "#A1A1AA",
+        primary: "#FFFFFF",
+        "primary-hover": "#E0E0E0",
+        secondary: "#A0A0A0",
+        accent: "#C8FF00",
+        "accent-hover": "#B8EF00",
+        surface: "#0A0A0A",
+        "surface-hover": "#141414",
+        "surface-light": "#1A1A1A",
+        muted: "#71717A",
         gold: "#FFD700",
         success: "#22C55E",
         error: "#EF4444",
-        border: "#2A2A3E",
+        border: "#1E1E1E",
+        "border-light": "#2A2A2A",
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "Inter", "system-ui", "sans-serif"],
+        sans: ["var(--font-geist)", "Geist", "system-ui", "sans-serif"],
+        display: ["var(--font-outfit)", "Outfit", "system-ui", "sans-serif"],
+        serif: ["var(--font-playfair)", "Playfair Display", "Georgia", "serif"],
       },
       animation: {
-        "fade-in": "fadeIn 0.5s ease-out",
-        "slide-up": "slideUp 0.5s ease-out",
-        "glow-pulse": "glowPulse 2s infinite",
-        float: "float 3s ease-in-out infinite",
+        "fade-in": "fadeIn 0.6s ease-out",
+        "slide-up": "slideUp 0.6s ease-out",
+        "marquee": "marquee 30s linear infinite",
       },
       keyframes: {
         fadeIn: {
@@ -41,13 +46,9 @@ const config: Config = {
           "0%": { opacity: "0", transform: "translateY(20px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
-        glowPulse: {
-          "0%, 100%": { boxShadow: "0 0 20px rgba(255, 107, 53, 0.3)" },
-          "50%": { boxShadow: "0 0 40px rgba(255, 107, 53, 0.6)" },
-        },
-        float: {
-          "0%, 100%": { transform: "translateY(0)" },
-          "50%": { transform: "translateY(-10px)" },
+        marquee: {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" },
         },
       },
     },

@@ -41,9 +41,9 @@ export default async function HomePage() {
         <Hero />
         <FeaturedCourses />
         <PopularProjects />
+        <PricingSection />
         <Testimonials />
         <ReferralBanner />
-        <PricingSection />
       </main>
       <Footer />
     </div>

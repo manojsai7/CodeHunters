@@ -8,7 +8,7 @@
   }
 
   body {
-    background-color: #0f0f0f;
+    background-color: #000000;
     color: #ffffff;
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
@@ -16,72 +16,67 @@
   }
 
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
   }
 
   ::-webkit-scrollbar-track {
-    background: #0f0f0f;
+    background: #000000;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #2a2a3e;
+    background: #1E1E1E;
     border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #3a3a5e;
+    background: #2A2A2A;
   }
 
   ::selection {
-    background-color: rgba(255, 107, 53, 0.3);
+    background-color: rgba(200, 255, 0, 0.25);
     color: #ffffff;
   }
 }
 
 @layer utilities {
   .text-gradient {
-    @apply bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-white to-muted bg-clip-text text-transparent;
   }
 
-  .glow-orange {
-    box-shadow: 0 0 20px rgba(255, 107, 53, 0.3),
-      0 0 40px rgba(255, 107, 53, 0.1);
+  .section-padding {
+    @apply py-24 lg:py-32;
   }
 
-  .glow-cyan {
-    box-shadow: 0 0 20px rgba(0, 212, 255, 0.3),
-      0 0 40px rgba(0, 212, 255, 0.1);
+  .section-container {
+    @apply mx-auto max-w-6xl px-5 sm:px-8 lg:px-10;
   }
 
-  .glass {
-    @apply bg-surface/60 backdrop-blur-xl border border-border/50;
+  .heading-xl {
+    @apply text-4xl font-bold tracking-tight md:text-6xl lg:text-7xl font-display;
   }
 
-  .card-hover {
-    @apply transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-primary/10 hover:border-primary/30;
+  .heading-lg {
+    @apply text-3xl font-bold tracking-tight md:text-5xl font-display;
   }
 
-  .gradient-mesh {
-    background: radial-gradient(
-        at 27% 37%,
-        rgba(255, 107, 53, 0.08) 0px,
-        transparent 50%
-      ),
-      radial-gradient(
-        at 97% 21%,
-        rgba(0, 212, 255, 0.06) 0px,
-        transparent 50%
-      ),
-      radial-gradient(
-        at 52% 99%,
-        rgba(255, 215, 0, 0.05) 0px,
-        transparent 50%
-      ),
-      radial-gradient(
-        at 10% 29%,
-        rgba(0, 212, 255, 0.04) 0px,
-        transparent 50%
-      );
+  .heading-md {
+    @apply text-2xl font-bold tracking-tight md:text-3xl font-display;
+  }
+
+  .body-lg {
+    @apply text-base text-muted md:text-lg leading-relaxed;
+  }
+
+  .card-base {
+    @apply rounded-2xl border border-border bg-surface-light/50 backdrop-blur-sm transition-all duration-300;
+  }
+
+  .card-interactive {
+    @apply card-base hover:border-border-light hover:bg-surface-light;
+  }
+
+  .divider {
+    @apply h-px w-full bg-border;
   }
 }

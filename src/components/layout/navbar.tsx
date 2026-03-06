@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Code2, Coins } from "lucide-react";
+import { Menu, X, Coins } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
@@ -34,36 +34,33 @@ export function Navbar({ user }: NavbarProps) {
   };
 
   return (
-    <header className="fixed top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl">
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+    <header className="fixed top-0 z-50 w-full bg-black/80 backdrop-blur-md border-b border-border">
+      <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 group">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary shadow-lg shadow-primary/25 transition-shadow group-hover:shadow-primary/40">
-            <Code2 className="h-5 w-5 text-white" />
-          </div>
-          <span className="text-xl font-bold text-white">
-            Code<span className="text-primary">Hunters</span>
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <span className="text-xl font-bold font-display tracking-tight text-white">
+            Code Hunters
           </span>
         </Link>
 
         {/* Desktop Nav */}
-        <div className="hidden items-center gap-1 md:flex">
+        <div className="hidden items-center gap-6 md:flex">
           <Link
             href="/courses"
-            className="rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:text-white hover:bg-surface"
+            className="text-sm text-muted transition-colors hover:text-white"
           >
             Courses
           </Link>
           <Link
             href="/projects"
-            className="rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:text-white hover:bg-surface"
+            className="text-sm text-muted transition-colors hover:text-white"
           >
             Projects
           </Link>
           {user && (
             <Link
               href="/dashboard/my-learning"
-              className="rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:text-white hover:bg-surface"
+              className="text-sm text-muted transition-colors hover:text-white"
             >
               My Learning
             </Link>
@@ -71,7 +68,7 @@ export function Navbar({ user }: NavbarProps) {
           {user?.role === "admin" && (
             <Link
               href="/admin/dashboard"
-              className="rounded-lg px-3 py-2 text-sm text-secondary transition-colors hover:text-white hover:bg-surface"
+              className="text-sm text-accent transition-colors hover:text-accent-hover"
             >
               Admin
             </Link>
@@ -85,14 +82,14 @@ export function Navbar({ user }: NavbarProps) {
               {typeof user.goldCoins === "number" && (
                 <Link
                   href="/dashboard/referral"
-                  className="flex items-center gap-1.5 rounded-full bg-gold/10 px-3 py-1.5 text-sm font-medium text-gold border border-gold/20 hover:bg-gold/20 transition-colors"
+                  className="flex items-center gap-1.5 rounded-full border border-border-light px-3 py-1.5 text-sm text-muted hover:text-white transition-colors"
                 >
-                  <Coins className="h-4 w-4" />
+                  <Coins className="h-3.5 w-3.5" />
                   {user.goldCoins}
                 </Link>
               )}
               <Link href="/dashboard/profile">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-semibold text-black">
                   {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
                 </div>
               </Link>
@@ -120,7 +117,7 @@ export function Navbar({ user }: NavbarProps) {
           onClick={() => setIsOpen(!isOpen)}
           aria-label={isOpen ? "Close menu" : "Open menu"}
         >
-          {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </nav>
 
@@ -131,20 +128,20 @@ export function Navbar({ user }: NavbarProps) {
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
           exit={{ opacity: 0, height: 0 }}
-          transition={{ duration: 0.25, ease: "easeInOut" }}
-          className="overflow-hidden border-t border-border/50 bg-background/95 backdrop-blur-xl md:hidden"
+          transition={{ duration: 0.2, ease: "easeInOut" }}
+          className="overflow-hidden border-t border-border bg-black/95 backdrop-blur-md md:hidden"
         >
-          <div className="space-y-1 px-4 pb-4 pt-2">
+          <div className="space-y-1 px-5 pb-5 pt-3">
             <Link
               href="/courses"
-              className="block rounded-lg px-3 py-2 text-sm text-muted hover:text-white hover:bg-surface"
+              className="block rounded-lg px-3 py-2.5 text-sm text-muted hover:text-white"
               onClick={() => setIsOpen(false)}
             >
               Courses
             </Link>
             <Link
               href="/projects"
-              className="block rounded-lg px-3 py-2 text-sm text-muted hover:text-white hover:bg-surface"
+              className="block rounded-lg px-3 py-2.5 text-sm text-muted hover:text-white"
               onClick={() => setIsOpen(false)}
             >
               Projects
@@ -153,22 +150,22 @@ export function Navbar({ user }: NavbarProps) {
               <>
                 <Link
                   href="/dashboard/my-learning"
-                  className="block rounded-lg px-3 py-2 text-sm text-muted hover:text-white hover:bg-surface"
+                  className="block rounded-lg px-3 py-2.5 text-sm text-muted hover:text-white"
                   onClick={() => setIsOpen(false)}
                 >
                   My Learning
                 </Link>
                 <Link
                   href="/dashboard/referral"
-                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gold hover:bg-surface"
+                  className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-muted hover:text-white"
                   onClick={() => setIsOpen(false)}
                 >
-                  <Coins className="h-4 w-4" />
-                  {user.goldCoins} Gold Coins
+                  <Coins className="h-3.5 w-3.5" />
+                  {user.goldCoins} Coins
                 </Link>
                 <Link
                   href="/dashboard/profile"
-                  className="block rounded-lg px-3 py-2 text-sm text-muted hover:text-white hover:bg-surface"
+                  className="block rounded-lg px-3 py-2.5 text-sm text-muted hover:text-white"
                   onClick={() => setIsOpen(false)}
                 >
                   Profile
@@ -176,7 +173,7 @@ export function Navbar({ user }: NavbarProps) {
                 {user.role === "admin" && (
                   <Link
                     href="/admin/dashboard"
-                    className="block rounded-lg px-3 py-2 text-sm text-secondary hover:bg-surface"
+                    className="block rounded-lg px-3 py-2.5 text-sm text-accent"
                     onClick={() => setIsOpen(false)}
                   >
                     Admin Panel
@@ -187,13 +184,13 @@ export function Navbar({ user }: NavbarProps) {
                     handleSignOut();
                     setIsOpen(false);
                   }}
-                  className="block w-full text-left rounded-lg px-3 py-2 text-sm text-error hover:bg-surface"
+                  className="block w-full text-left rounded-lg px-3 py-2.5 text-sm text-error"
                 >
                   Sign Out
                 </button>
               </>
             ) : (
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2 pt-3">
                 <Link href="/login" className="flex-1" onClick={() => setIsOpen(false)}>
                   <Button variant="outline" className="w-full" size="sm">
                     Sign In

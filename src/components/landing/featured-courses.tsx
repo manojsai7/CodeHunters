@@ -2,10 +2,9 @@
 
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
-import { Star, Users, ArrowRight, BookOpen, Flame } from "lucide-react";
+import { Star, Users, ArrowRight, Flame } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import Link from "next/link";
 
 const courses = [
   {
@@ -18,7 +17,6 @@ const courses = [
     price: 1499,
     mrp: 4999,
     bestseller: true,
-    gradient: "from-primary/40 to-secondary/30",
   },
   {
     title: "React Native — Build 10 Apps",
@@ -30,7 +28,6 @@ const courses = [
     price: 999,
     mrp: 3499,
     bestseller: true,
-    gradient: "from-secondary/40 to-gold/20",
   },
   {
     title: "DSA with JavaScript — Zero to Hero",
@@ -42,16 +39,15 @@ const courses = [
     price: 499,
     mrp: 1999,
     bestseller: false,
-    gradient: "from-gold/30 to-primary/30",
   },
 ];
 
 const cardVariants = {
-  hidden: { opacity: 0, y: 40 },
+  hidden: { opacity: 0, y: 30 },
   visible: (i: number) => ({
     opacity: 1,
     y: 0,
-    transition: { delay: i * 0.15, duration: 0.6, ease: [0.22, 1, 0.36, 1] as const },
+    transition: { delay: i * 0.1, duration: 0.6, ease: [0.22, 1, 0.36, 1] as const },
   }),
 };
 
@@ -60,32 +56,29 @@ export default function FeaturedCourses() {
   const inView = useInView(ref, { once: true, margin: "-80px" });
 
   return (
-    <section className="relative bg-background py-24 lg:py-32 overflow-hidden">
-      {/* Decorative blurs */}
-      <div className="pointer-events-none absolute -right-40 top-20 h-[400px] w-[400px] rounded-full bg-primary/5 blur-[100px]" />
-      <div className="pointer-events-none absolute -left-40 bottom-20 h-[300px] w-[300px] rounded-full bg-secondary/5 blur-[100px]" />
-
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <section className="relative bg-black section-padding overflow-hidden">
+      <div className="section-container">
         {/* Heading */}
         <motion.div
           ref={ref}
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}
-          className="mb-14 text-center"
+          className="mb-16"
         >
-          <h2 className="text-3xl font-bold md:text-5xl">
-            Featured <span className="text-primary">Courses</span>
+          <p className="text-sm tracking-widest uppercase text-muted mb-4">
+            What you&apos;ll learn
+          </p>
+          <h2 className="heading-lg">
+            Featured <span className="font-serif italic font-normal">Courses</span>
           </h2>
-          <div className="mx-auto mt-3 h-1 w-20 rounded-full bg-gradient-to-r from-primary to-secondary" />
-          <p className="mt-5 text-muted md:text-lg">
-            Industry-grade courses designed to make you job-ready, not just
-            tutorial-ready.
+          <p className="mt-4 text-muted max-w-lg text-base">
+            Industry-grade courses designed to make you job-ready, not just tutorial-ready.
           </p>
         </motion.div>
 
         {/* Grid */}
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {courses.map((course, i) => (
             <motion.div
               key={course.title}
@@ -93,79 +86,69 @@ export default function FeaturedCourses() {
               initial="hidden"
               animate={inView ? "visible" : "hidden"}
               variants={cardVariants}
+              className="group card-interactive flex flex-col p-6"
             >
-              <Card className="card-hover group relative flex h-full flex-col overflow-hidden">
-                {/* Thumbnail */}
-                <div
-                  className={`relative h-44 w-full bg-gradient-to-br ${course.gradient}`}
-                >
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <BookOpen className="h-12 w-12 text-white/30" />
-                  </div>
-                  {course.bestseller && (
-                    <Badge
-                      variant="bestseller"
-                      className="absolute left-3 top-3 flex items-center gap-1"
-                    >
-                      <Flame className="h-3 w-3" />
-                      Bestseller
-                    </Badge>
-                  )}
+              {/* Header row */}
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs tracking-wider uppercase text-muted">
+                    {course.category}
+                  </span>
+                  <span className="text-xs text-border-light">•</span>
+                  <span className="text-xs text-muted">{course.difficulty}</span>
                 </div>
+                {course.bestseller && (
+                  <span className="flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-accent">
+                    <Flame className="h-3 w-3" />
+                    Popular
+                  </span>
+                )}
+              </div>
 
-                <CardContent className="flex flex-1 flex-col gap-3 p-5">
-                  {/* Category & Difficulty */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="secondary">{course.category}</Badge>
-                    <Badge variant="outline">{course.difficulty}</Badge>
-                  </div>
+              {/* Title */}
+              <h3 className="text-lg font-semibold leading-snug group-hover:text-white/80 transition-colors mb-4">
+                {course.title}
+              </h3>
 
-                  {/* Title */}
-                  <h3 className="text-lg font-semibold leading-snug group-hover:text-primary transition-colors">
-                    {course.title}
-                  </h3>
+              {/* Tech chips */}
+              <div className="flex flex-wrap gap-1.5 mb-5">
+                {course.techStack.map((t) => (
+                  <span
+                    key={t}
+                    className="rounded-full border border-border bg-surface px-2.5 py-0.5 text-[11px] text-muted"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
 
-                  {/* Tech chips */}
-                  <div className="flex flex-wrap gap-1.5">
-                    {course.techStack.map((t) => (
-                      <span
-                        key={t}
-                        className="rounded-md bg-surface-hover px-2 py-0.5 text-xs text-muted"
-                      >
-                        {t}
-                      </span>
-                    ))}
-                  </div>
+              {/* Rating + students */}
+              <div className="flex items-center gap-4 text-sm mb-5">
+                <span className="flex items-center gap-1 text-white/70">
+                  <Star className="h-3.5 w-3.5 fill-white/70 text-white/70" />
+                  {course.rating}
+                </span>
+                <span className="flex items-center gap-1 text-muted">
+                  <Users className="h-3.5 w-3.5" />
+                  {course.students.toLocaleString()} students
+                </span>
+              </div>
 
-                  {/* Rating + students */}
-                  <div className="flex items-center gap-3 text-sm">
-                    <span className="flex items-center gap-1 text-gold">
-                      <Star className="h-4 w-4 fill-gold" />
-                      {course.rating}
-                    </span>
-                    <span className="flex items-center gap-1 text-muted">
-                      <Users className="h-4 w-4" />
-                      {course.students.toLocaleString()}
-                    </span>
-                  </div>
+              {/* Spacer */}
+              <div className="flex-1" />
 
-                  {/* Spacer */}
-                  <div className="flex-1" />
-
-                  {/* Price */}
-                  <div className="flex items-end gap-2 pt-2 border-t border-border">
-                    <span className="text-2xl font-bold text-primary">
-                      ₹{course.price}
-                    </span>
-                    <span className="text-sm text-muted line-through">
-                      ₹{course.mrp}
-                    </span>
-                    <span className="ml-auto rounded-md bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-                      {Math.round((1 - course.price / course.mrp) * 100)}% OFF
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Price */}
+              <div className="flex items-end gap-3 pt-5 border-t border-border">
+                <span className="text-2xl font-bold text-white font-display">
+                  ₹{course.price}
+                </span>
+                <span className="text-sm text-muted line-through">
+                  ₹{course.mrp}
+                </span>
+                <span className="ml-auto rounded-full bg-success/10 px-2.5 py-0.5 text-[11px] font-medium text-success">
+                  {Math.round((1 - course.price / course.mrp) * 100)}% OFF
+                </span>
+              </div>
             </motion.div>
           ))}
         </div>
@@ -174,13 +157,15 @@ export default function FeaturedCourses() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={inView ? { opacity: 1 } : {}}
-          transition={{ delay: 0.6 }}
-          className="mt-12 text-center"
+          transition={{ delay: 0.5 }}
+          className="mt-14 text-center"
         >
-          <Button variant="outline" size="lg" className="group">
-            View All Courses
-            <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-          </Button>
+          <Link href="/courses">
+            <Button variant="outline" size="lg" className="group">
+              View All Courses
+              <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Button>
+          </Link>
         </motion.div>
       </div>
     </section>
