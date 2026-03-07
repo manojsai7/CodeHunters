@@ -13,6 +13,7 @@ import {
   Gift,
   UserPlus,
   Settings,
+  ShieldCheck,
   Menu,
   X,
   ChevronLeft,
@@ -21,17 +22,22 @@ import {
 import { Button } from "@/components/ui/button";
 
 const navItems = [
-  { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
-  { label: "Courses", href: "/admin/courses", icon: BookOpen },
-  { label: "Projects", href: "/admin/projects", icon: FolderOpen },
-  { label: "Users", href: "/admin/users", icon: Users },
-  { label: "Coupons", href: "/admin/coupons", icon: Ticket },
-  { label: "Referrals", href: "/admin/referrals", icon: Gift },
-  { label: "Leads", href: "/admin/leads", icon: UserPlus },
-  { label: "Settings", href: "/admin/settings", icon: Settings },
+  { label: "Dashboard", href: "/admin",           icon: LayoutDashboard, ownerOnly: false },
+  { label: "Courses",   href: "/admin/courses",   icon: BookOpen,        ownerOnly: false },
+  { label: "Projects",  href: "/admin/projects",  icon: FolderOpen,      ownerOnly: false },
+  { label: "Users",     href: "/admin/users",     icon: Users,           ownerOnly: false },
+  { label: "Coupons",   href: "/admin/coupons",   icon: Ticket,          ownerOnly: false },
+  { label: "Referrals", href: "/admin/referrals", icon: Gift,            ownerOnly: false },
+  { label: "Leads",     href: "/admin/leads",     icon: UserPlus,        ownerOnly: false },
+  { label: "Settings",  href: "/admin/settings",  icon: Settings,        ownerOnly: false },
+  { label: "Manage Admins", href: "/admin/admins", icon: ShieldCheck,    ownerOnly: true  },
 ];
 
-export function AdminSidebar() {
+interface AdminSidebarProps {
+  role?: string;
+}
+
+export function AdminSidebar({ role = "admin" }: AdminSidebarProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -55,7 +61,7 @@ export function AdminSidebar() {
 
       {/* Nav */}
       <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
-        {navItems.map((item) => {
+        {navItems.filter(item => !item.ownerOnly || role === "owner").map((item) => {
           const active = isActive(item.href);
           return (
             <Link

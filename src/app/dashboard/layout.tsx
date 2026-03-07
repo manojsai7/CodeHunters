@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
@@ -15,34 +14,54 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  try {
   const user = await getUser();
 
   if (!user) {
     redirect("/login");
   }
 
-  let profile = await prisma.profile.findUnique({
-    where: { userId: user.id },
-  });
+  // Try to load profile from DB — fall back to auth metadata if DB is unreachable.
+  let profile: {
+    email: string; name: string; role: string; goldCoins: number; avatarUrl: string | null;
+  } | null = null;
 
-  if (!profile) {
-    // Profile missing — create it now so the user isn't stuck in a redirect loop.
-    // This handles the case where the auth callback ran before the DB was ready.
-    const referralCode = await createReferralCode();
-    const name =
-      user.user_metadata?.full_name ||
-      user.user_metadata?.name ||
-      user.email?.split("@")[0] ||
-      "User";
-    profile = await prisma.profile.create({
-      data: {
-        userId: user.id,
-        email: user.email ?? "",
-        name,
-        referralCode,
-      },
-    });
+  try {
+    let dbProfile = await prisma.profile.findUnique({ where: { userId: user.id } });
+
+    if (!dbProfile) {
+      const referralCode = await createReferralCode();
+      const name =
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.email?.split("@")[0] ||
+        "User";
+      dbProfile = await prisma.profile.create({
+        data: { userId: user.id, email: user.email ?? "", name, referralCode },
+      });
+    }
+
+    profile = {
+      email: dbProfile.email,
+      name: dbProfile.name,
+      role: dbProfile.role,
+      goldCoins: dbProfile.goldCoins,
+      avatarUrl: dbProfile.avatarUrl,
+    };
+  } catch (dbErr) {
+    // DB unreachable (e.g. DATABASE_URL not set) — fall back to auth metadata
+    // so the user can at least see the dashboard shell while we diagnose.
+    console.error("[dashboard/layout] DB unavailable, using auth metadata:", dbErr);
+    profile = {
+      email: user.email ?? "",
+      name:
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.email?.split("@")[0] ||
+        "User",
+      role: "student",
+      goldCoins: 0,
+      avatarUrl: user.user_metadata?.avatar_url ?? null,
+    };
   }
 
   return (
@@ -50,20 +69,20 @@ export default async function DashboardLayout({
       <Navbar
         user={{
           id: user.id,
-          email: profile.email,
-          name: profile.name,
-          role: profile.role,
-          goldCoins: profile.goldCoins,
+          email: profile!.email,
+          name: profile!.name,
+          role: profile!.role,
+          goldCoins: profile!.goldCoins,
         }}
       />
 
       <DashboardSidebar
         profile={{
-          name: profile.name,
-          email: profile.email,
-          role: profile.role,
-          goldCoins: profile.goldCoins,
-          avatarUrl: profile.avatarUrl,
+          name: profile!.name,
+          email: profile!.email,
+          role: profile!.role,
+          goldCoins: profile!.goldCoins,
+          avatarUrl: profile!.avatarUrl,
         }}
       />
 
@@ -74,18 +93,4 @@ export default async function DashboardLayout({
       </main>
     </div>
   );
-  } catch (e: unknown) {
-    // Rethrow Next.js redirect/not-found errors (they carry a 'digest' property).
-    if (e && typeof e === 'object' && 'digest' in e) throw e;
-    console.error("[dashboard/layout] Failed to load:", e);
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <h1 className="text-xl font-bold text-white">Something went wrong</h1>
-          <p className="mt-2 text-muted">We couldn&apos;t load the dashboard. Please try again.</p>
-          <Link href="/" className="mt-4 inline-block text-accent hover:underline">Go to homepage</Link>
-        </div>
-      </div>
-    );
-  }
 }

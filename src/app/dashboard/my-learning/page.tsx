@@ -210,6 +210,7 @@ export default async function MyLearningPage() {
   } catch (e: unknown) {
     // Re-throw Next.js redirect/notFound errors (they use a special 'digest' property)
     if (e && typeof e === 'object' && 'digest' in e) throw e;
+    const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("[my-learning] Failed to load data:", e);
     return (
       <div className="space-y-6">
@@ -221,10 +222,13 @@ export default async function MyLearningPage() {
             <div className="rounded-full bg-destructive/10 p-4 mb-4">
               <BookOpen className="h-8 w-8 text-destructive" />
             </div>
-            <h3 className="text-lg font-semibold text-white">Something went wrong</h3>
+            <h3 className="text-lg font-semibold text-white">Couldn&apos;t load your courses</h3>
             <p className="mt-1 max-w-sm text-sm text-muted">
-              We couldn&apos;t load your courses right now. Please try refreshing the page.
+              {msg.includes("DATABASE_URL") || msg.includes("connect") || msg.includes("ECONNREFUSED")
+                ? "Database is not connected. Please ensure DATABASE_URL is set in environment variables."
+                : "We couldn't load your courses right now. Please try refreshing the page."}
             </p>
+            <p className="mt-2 max-w-sm text-xs font-mono text-muted/60 break-all">{msg}</p>
             <Link href="/dashboard/my-learning">
               <Button className="mt-5">Try Again</Button>
             </Link>
