@@ -5,7 +5,14 @@ import { Resend } from "resend";
 import CoinRewardEmail from "@emails/CoinRewardEmail";
 import { z } from "zod";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazily initialized to avoid build-time errors when env vars are unavailable
+let _resend: Resend | null = null;
+function getResend(): Resend {
+  if (!_resend) {
+    _resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return _resend;
+}
 
 const campaignSchema = z.object({
   discountPercent: z.number().min(1).max(100),
@@ -86,7 +93,7 @@ export async function POST(request: NextRequest) {
         });
 
         try {
-          await resend.emails.send({
+          await getResend().emails.send({
             from: fromEmail,
             to: targetUser.email,
             subject: `🎁 ${discountPercent}% off — exclusive Code Hunters coupon inside!`,
