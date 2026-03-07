@@ -4,7 +4,8 @@ import Image from "next/image";
 import { getUser } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
-import { FolderDown, Download, ExternalLink } from "lucide-react";
+import { FolderDown } from "lucide-react";
+import { SecureDownloadButton } from "@/components/dashboard/secure-download-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -103,21 +104,7 @@ export default async function MyProjectsPage() {
                   Purchased {formatDate(project.purchasedAt)}
                 </div>
 
-                <a
-                  href={project.zipUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="mt-3 w-full gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    Download Project
-                    <ExternalLink className="h-3 w-3 opacity-60" />
-                  </Button>
-                </a>
+                <SecureDownloadButton projectId={project.id} />
               </CardContent>
             </Card>
           ))}

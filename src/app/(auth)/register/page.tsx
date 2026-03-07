@@ -9,19 +9,22 @@ export const metadata = {
 };
 
 interface RegisterPageProps {
-  searchParams: Promise<{ ref?: string }>;
+  searchParams: Promise<{ ref?: string; error?: string }>;
 }
 
 export default async function RegisterPage({ searchParams: searchParamsPromise }: RegisterPageProps) {
   const searchParams = await searchParamsPromise;
-  try {
-    const user = await getUser();
-    if (user) {
-      redirect("/dashboard/my-learning");
+
+  if (!searchParams.error) {
+    try {
+      const user = await getUser();
+      if (user) {
+        redirect("/dashboard/my-learning");
+      }
+    } catch (e: unknown) {
+      if (e && typeof e === 'object' && 'digest' in e) throw e;
+      // Supabase not configured — show register form anyway
     }
-  } catch (e: unknown) {
-    if (e && typeof e === 'object' && 'digest' in e) throw e;
-    // Supabase not configured — show register form anyway
   }
 
   return <RegisterForm referralCode={searchParams.ref} />;

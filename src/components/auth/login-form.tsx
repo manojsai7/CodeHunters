@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
 
@@ -44,7 +45,8 @@ export function LoginForm() {
       }
 
       toast.success("Welcome back!");
-      router.push("/dashboard");
+      const redirectTo = searchParams.get("redirect") || "/dashboard/my-learning";
+      router.push(redirectTo);
       router.refresh();
     } catch {
       toast.error("Something went wrong. Please try again.");
