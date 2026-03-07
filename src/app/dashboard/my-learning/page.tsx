@@ -208,7 +208,29 @@ export default async function MyLearningPage() {
     </div>
   );
   } catch (e: unknown) {
+    // Re-throw Next.js redirect/notFound errors (they use a special 'digest' property)
     if (e && typeof e === 'object' && 'digest' in e) throw e;
-    redirect("/login?error=true");
+    console.error("[my-learning] Failed to load data:", e);
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white sm:text-3xl">My Learning</h1>
+        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center py-16 text-center">
+            <div className="rounded-full bg-destructive/10 p-4 mb-4">
+              <BookOpen className="h-8 w-8 text-destructive" />
+            </div>
+            <h3 className="text-lg font-semibold text-white">Something went wrong</h3>
+            <p className="mt-1 max-w-sm text-sm text-muted">
+              We couldn&apos;t load your courses right now. Please try refreshing the page.
+            </p>
+            <Link href="/dashboard/my-learning">
+              <Button className="mt-5">Try Again</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 }

@@ -42,42 +42,48 @@ export async function GET(request: Request) {
       } = await supabase.auth.getUser();
 
       if (user) {
-        const existingProfile = await prisma.profile.findUnique({
-          where: { userId: user.id },
-        });
-
-        if (!existingProfile) {
-          const referralCode = await createReferralCode();
-          const name =
-            user.user_metadata?.full_name ||
-            user.user_metadata?.name ||
-            user.email?.split("@")[0] ||
-            "User";
-
-          await prisma.profile.create({
-            data: {
-              userId: user.id,
-              email: user.email || "",
-              name,
-              referralCode,
-            },
+        // Wrapped in try/catch so a DB failure does NOT block the email confirmation redirect.
+        try {
+          const existingProfile = await prisma.profile.findUnique({
+            where: { userId: user.id },
           });
 
-          const ref = user.user_metadata?.referral_code as string | undefined;
-          if (ref) {
-            await recordReferral(ref, user.id, name);
-          }
+          if (!existingProfile) {
+            const referralCode = await createReferralCode();
+            const name =
+              user.user_metadata?.full_name ||
+              user.user_metadata?.name ||
+              user.email?.split("@")[0] ||
+              "User";
 
-          if (user.email) {
-            sendWelcomeEmail(user.email, name, referralCode);
-            prisma.emailLog
-              .create({
-                data: { userId: user.id, emailType: "welcome" },
-              })
-              .catch((err: unknown) =>
-                console.error("Failed to log welcome email:", err)
-              );
+            await prisma.profile.create({
+              data: {
+                userId: user.id,
+                email: user.email || "",
+                name,
+                referralCode,
+              },
+            });
+
+            const ref = user.user_metadata?.referral_code as string | undefined;
+            if (ref) {
+              await recordReferral(ref, user.id, name);
+            }
+
+            if (user.email) {
+              sendWelcomeEmail(user.email, name, referralCode);
+              prisma.emailLog
+                .create({
+                  data: { userId: user.id, emailType: "welcome" },
+                })
+                .catch((err: unknown) =>
+                  console.error("Failed to log welcome email:", err)
+                );
+            }
           }
+        } catch (profileErr) {
+          // Profile creation failed (DB unreachable, etc.) — log but don't block confirmation
+          console.error("[auth/confirm] Profile creation failed:", profileErr);
         }
       }
 
