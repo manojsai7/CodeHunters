@@ -3,13 +3,55 @@
 @tailwind utilities;
 
 @layer base {
+  /* ── Light theme (default) ── */
+  :root {
+    --color-background: #FFFFFF;
+    --color-foreground: #0F172A;
+    --color-primary: #0F172A;
+    --color-primary-hover: #1E293B;
+    --color-primary-foreground: #FFFFFF;
+    --color-secondary: #64748B;
+    --color-accent: #65A30D;
+    --color-accent-hover: #4D7C0F;
+    --color-surface: #F8FAFC;
+    --color-surface-hover: #F1F5F9;
+    --color-surface-light: #F1F5F9;
+    --color-muted: #64748B;
+    --color-gold: #CA8A04;
+    --color-success: #16A34A;
+    --color-error: #DC2626;
+    --color-border: #E2E8F0;
+    --color-border-light: #CBD5E1;
+  }
+
+  /* ── Dark theme ── */
+  .dark {
+    --color-background: #000000;
+    --color-foreground: #FFFFFF;
+    --color-primary: #FFFFFF;
+    --color-primary-hover: #E0E0E0;
+    --color-primary-foreground: #000000;
+    --color-secondary: #A0A0A0;
+    --color-accent: #C8FF00;
+    --color-accent-hover: #B8EF00;
+    --color-surface: #0A0A0A;
+    --color-surface-hover: #141414;
+    --color-surface-light: #1A1A1A;
+    --color-muted: #71717A;
+    --color-gold: #FFD700;
+    --color-success: #22C55E;
+    --color-error: #EF4444;
+    --color-border: #1E1E1E;
+    --color-border-light: #2A2A2A;
+  }
+
   * {
-    border-color: theme("colors.border");
+    border-color: var(--color-border);
   }
 
   body {
-    background-color: #000000;
-    color: #ffffff;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -21,21 +63,21 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: #000000;
+    background: var(--color-background);
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #1E1E1E;
+    background: var(--color-border);
     border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #2A2A2A;
+    background: var(--color-border-light);
   }
 
   ::selection {
     background-color: rgba(200, 255, 0, 0.25);
-    color: #ffffff;
+    color: var(--color-foreground);
   }
 }
 

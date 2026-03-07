@@ -83,7 +83,7 @@ export function LoginForm() {
           <Link href="/" className="mb-10 flex items-center justify-center gap-3">
             <Image src="/logo.png" alt="Code Hunters" width={56} height={56} className="rounded-xl" />
           </Link>
-          <h2 className="text-3xl font-bold font-display text-white leading-tight">
+          <h2 className="text-3xl font-bold font-display text-foreground leading-tight">
             Hunt the Skills.<br />
             <span className="font-serif italic font-normal text-accent">Build the Future.</span>
           </h2>
@@ -92,15 +92,15 @@ export function LoginForm() {
           </p>
           <div className="mt-10 flex justify-center gap-8">
             <div className="text-center">
-              <p className="text-2xl font-bold text-white font-display">50+</p>
+              <p className="text-2xl font-bold text-foreground font-display">50+</p>
               <p className="text-xs text-muted uppercase tracking-wider">Courses</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-white font-display">700+</p>
+              <p className="text-2xl font-bold text-foreground font-display">700+</p>
               <p className="text-xs text-muted uppercase tracking-wider">Projects</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-white font-display">4.9</p>
+              <p className="text-2xl font-bold text-foreground font-display">4.9</p>
               <p className="text-xs text-muted uppercase tracking-wider">Rating</p>
             </div>
           </div>
@@ -118,14 +118,14 @@ export function LoginForm() {
           {/* Mobile logo */}
           <Link href="/" className="mb-8 flex items-center justify-center gap-2.5 lg:hidden">
             <Image src="/logo.png" alt="Code Hunters" width={40} height={40} className="rounded-lg" />
-            <span className="text-2xl font-bold font-display text-white">
+            <span className="text-2xl font-bold font-display text-foreground">
               Code Hunters
             </span>
           </Link>
 
           <div className="rounded-2xl border border-border bg-surface p-8">
             <div className="mb-6 text-center">
-              <h1 className="text-2xl font-semibold text-white">Welcome back</h1>
+              <h1 className="text-2xl font-semibold text-foreground">Welcome back</h1>
               <p className="mt-1.5 text-sm text-muted">
                 Sign in to continue your learning journey
               </p>
@@ -181,7 +181,7 @@ export function LoginForm() {
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div className="space-y-1.5">
-                <label htmlFor="email" className="text-sm font-medium text-muted">
+                <label htmlFor="email" className="text-sm font-medium text-foreground">
                   Email
                 </label>
                 <Input
@@ -195,7 +195,7 @@ export function LoginForm() {
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label htmlFor="password" className="text-sm font-medium text-muted">
+                  <label htmlFor="password" className="text-sm font-medium text-foreground">
                     Password
                   </label>
                   <Link
@@ -229,7 +229,7 @@ export function LoginForm() {
             Don&apos;t have an account?{" "}
             <Link
               href="/register"
-              className="font-medium text-white hover:text-accent transition-colors"
+              className="font-medium text-foreground hover:text-accent transition-colors"
             >
               Create account
             </Link>

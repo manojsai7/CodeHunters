@@ -72,7 +72,7 @@ export function ProjectCard({ project, index = 0 }: ProjectCardProps) {
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/30 to-secondary/20">
-                <span className="text-3xl font-bold text-white/30">CH</span>
+                <span className="text-3xl font-bold text-foreground/30">CH</span>
               </div>
             )}
 
@@ -106,7 +106,7 @@ export function ProjectCard({ project, index = 0 }: ProjectCardProps) {
           {/* Content */}
           <div className="flex flex-col gap-3 p-4">
             {/* Title */}
-            <h3 className="line-clamp-2 text-sm font-semibold text-white leading-snug group-hover:text-primary transition-colors">
+            <h3 className="line-clamp-2 text-sm font-semibold text-foreground leading-snug group-hover:text-primary transition-colors">
               {project.title}
             </h3>
 
@@ -120,13 +120,13 @@ export function ProjectCard({ project, index = 0 }: ProjectCardProps) {
               {project.techTags.slice(0, 4).map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-md bg-white/5 px-1.5 py-0.5 text-[10px] text-muted"
+                  className="rounded-md bg-foreground/5 px-1.5 py-0.5 text-[10px] text-muted"
                 >
                   {tag}
                 </span>
               ))}
               {project.techTags.length > 4 && (
-                <span className="rounded-md bg-white/5 px-1.5 py-0.5 text-[10px] text-muted">
+                <span className="rounded-md bg-foreground/5 px-1.5 py-0.5 text-[10px] text-muted">
                   +{project.techTags.length - 4} more
                 </span>
               )}

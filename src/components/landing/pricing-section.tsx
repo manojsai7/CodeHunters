@@ -128,7 +128,7 @@ export default function PricingSection() {
                 {tier.originalPrice && (
                   <span className="text-sm text-muted line-through">{tier.originalPrice}</span>
                 )}
-                <span className="text-4xl font-bold font-display text-white">
+                <span className="text-4xl font-bold font-display text-foreground">
                   {tier.price}
                 </span>
                 {tier.originalPrice && (
@@ -143,7 +143,7 @@ export default function PricingSection() {
               <ul className="flex flex-col gap-3 mb-8">
                 {tier.features.map((feat) => (
                   <li key={feat} className="flex items-start gap-3 text-sm">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-foreground/40" />
                     <span className="text-muted">{feat}</span>
                   </li>
                 ))}

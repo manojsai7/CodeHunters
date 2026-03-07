@@ -106,7 +106,7 @@ export default function FeaturedCourses() {
               </div>
 
               {/* Title */}
-              <h3 className="text-lg font-semibold leading-snug group-hover:text-white/80 transition-colors mb-4">
+              <h3 className="text-lg font-semibold leading-snug group-hover:text-foreground/80 transition-colors mb-4">
                 {course.title}
               </h3>
 
@@ -124,8 +124,8 @@ export default function FeaturedCourses() {
 
               {/* Rating + students */}
               <div className="flex items-center gap-4 text-sm mb-5">
-                <span className="flex items-center gap-1 text-white/70">
-                  <Star className="h-3.5 w-3.5 fill-white/70 text-white/70" />
+                <span className="flex items-center gap-1 text-foreground/70">
+                  <Star className="h-3.5 w-3.5 fill-foreground/70 text-foreground/70" />
                   {course.rating}
                 </span>
                 <span className="flex items-center gap-1 text-muted">
@@ -139,7 +139,7 @@ export default function FeaturedCourses() {
 
               {/* Price */}
               <div className="flex items-end gap-3 pt-5 border-t border-border">
-                <span className="text-2xl font-bold text-white font-display">
+                <span className="text-2xl font-bold text-foreground font-display">
                   ₹{course.price}
                 </span>
                 <span className="text-sm text-muted line-through">

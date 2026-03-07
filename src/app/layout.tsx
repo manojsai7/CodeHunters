@@ -3,6 +3,7 @@ import { Outfit, Playfair_Display } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Toaster } from "sonner";
+import { ThemeProvider } from "@/components/ui/theme-provider";
 
 const geist = localFont({
   src: "./fonts/GeistVF.woff",
@@ -80,19 +81,26 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark scroll-smooth" suppressHydrationWarning>
+    <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <body className={`${geist.variable} ${outfit.variable} ${playfair.variable} font-sans antialiased`}>
-        {children}
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            style: {
-              background: "#0A0A0A",
-              border: "1px solid #1E1E1E",
-              color: "#FFFFFF",
-            },
-          }}
-        />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-foreground)",
+              },
+            }}
+          />
+        </ThemeProvider>
       </body>
     </html>
   );

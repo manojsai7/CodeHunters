@@ -28,8 +28,8 @@ export default function ReferralBanner() {
             <span className="font-serif italic font-normal">Earn Rewards.</span>
           </h3>
           <p className="mx-auto max-w-lg text-muted text-base mb-8">
-            Share your unique referral code and earn <span className="text-white font-medium">15 gold coins</span> for
-            every purchase. Redeem coins for <span className="text-white font-medium">20% off</span> any course or project.
+            Share your unique referral code and earn <span className="text-foreground font-medium">15 gold coins</span> for
+            every purchase. Redeem coins for <span className="text-foreground font-medium">20% off</span> any course or project.
           </p>
           <Link href="/dashboard/referrals">
             <Button variant="default" size="lg" className="group">

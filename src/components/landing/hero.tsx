@@ -23,9 +23,9 @@ const stats = [
 
 export default function Hero() {
   return (
-    <section className="relative min-h-screen overflow-hidden bg-black">
+    <section className="relative min-h-screen overflow-hidden bg-background">
       {/* Subtle radial glow */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-white/[0.02] blur-[120px] pointer-events-none" />
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-foreground/[0.02] blur-[120px] pointer-events-none" />
 
       <div className="relative mx-auto max-w-6xl px-5 sm:px-8 lg:px-10 pt-32 pb-20 lg:pt-44 lg:pb-28">
         {/* Center-aligned editorial hero */}
@@ -49,10 +49,10 @@ export default function Hero() {
               <span className="block text-4xl font-light text-muted font-display md:text-5xl lg:text-6xl">
                 not just another
               </span>
-              <span className="block mt-2 text-5xl font-bold tracking-tight text-white font-display md:text-7xl lg:text-8xl">
+              <span className="block mt-2 text-5xl font-bold tracking-tight text-foreground font-display md:text-7xl lg:text-8xl">
                 Programming
               </span>
-              <span className="block mt-1 text-5xl font-bold tracking-tight text-white font-display md:text-7xl lg:text-8xl">
+              <span className="block mt-1 text-5xl font-bold tracking-tight text-foreground font-display md:text-7xl lg:text-8xl">
                 <span className="font-serif italic font-normal">Course</span> Platform
               </span>
             </motion.h1>
@@ -93,7 +93,7 @@ export default function Hero() {
         >
           {stats.map((stat, i) => (
             <div key={stat.label} className="flex flex-col items-center gap-1">
-              <span className="text-3xl font-bold font-display md:text-4xl text-white">
+              <span className="text-3xl font-bold font-display md:text-4xl text-foreground">
                 {stat.value}
               </span>
               <span className="text-xs tracking-wider uppercase text-muted">

@@ -3,7 +3,7 @@ import { Github, Twitter, Linkedin, Mail } from "lucide-react";
 
 export function Footer() {
   return (
-    <footer className="relative bg-black">
+    <footer className="relative bg-background">
       {/* Divider */}
       <div className="h-px w-full bg-border" />
 
@@ -11,7 +11,7 @@ export function Footer() {
         <div className="grid grid-cols-1 gap-10 md:grid-cols-4">
           {/* Brand */}
           <div className="space-y-4">
-            <Link href="/" className="text-xl font-bold font-display text-white">
+            <Link href="/" className="text-xl font-bold font-display text-foreground">
               Code Hunters
             </Link>
             <p className="text-sm text-muted leading-relaxed">
@@ -28,7 +28,7 @@ export function Footer() {
                 <a
                   key={social.label}
                   href={social.href}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted hover:text-white hover:border-white/30 transition-all duration-300"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted hover:text-foreground hover:border-foreground/30 transition-all duration-300"
                   aria-label={social.label}
                 >
                   <social.icon className="h-4 w-4" />
@@ -39,7 +39,7 @@ export function Footer() {
 
           {/* Courses */}
           <div>
-            <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-white">
+            <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-foreground">
               Courses
             </h3>
             <ul className="space-y-2.5">
@@ -53,7 +53,7 @@ export function Footer() {
                 <li key={item}>
                   <Link
                     href={`/courses?category=${encodeURIComponent(item)}`}
-                    className="text-sm text-muted hover:text-white transition-colors"
+                    className="text-sm text-muted hover:text-foreground transition-colors"
                   >
                     {item}
                   </Link>
@@ -64,7 +64,7 @@ export function Footer() {
 
           {/* Projects */}
           <div>
-            <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-white">
+            <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-foreground">
               Projects
             </h3>
             <ul className="space-y-2.5">
@@ -89,7 +89,7 @@ export function Footer() {
 
           {/* Company */}
           <div>
-            <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-white">
+            <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-foreground">
               Company
             </h3>
             <ul className="space-y-2.5">

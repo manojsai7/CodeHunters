@@ -1,9 +1,30 @@
-import { NextResponse } from "next/server";
-import { verifySignatureAppRouter } from "@upstash/qstash/nextjs";
+import { NextRequest, NextResponse } from "next/server";
+import { Receiver } from "@upstash/qstash";
 import prisma from "@/lib/prisma";
 import { sendOnboardingDay3Email, sendOnboardingDay7Email } from "@/lib/email";
 
-async function handler() {
+async function verifyQStashSignature(request: NextRequest): Promise<boolean> {
+  const signature = request.headers.get("upstash-signature");
+  if (!signature) return false;
+
+  try {
+    const receiver = new Receiver({
+      currentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY!,
+      nextSigningKey: process.env.QSTASH_NEXT_SIGNING_KEY!,
+    });
+    const body = await request.clone().text();
+    return await receiver.verify({ signature, body });
+  } catch {
+    return false;
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const isValid = await verifyQStashSignature(request);
+  if (!isValid) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const now = new Date();
   const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -66,5 +87,3 @@ async function handler() {
     timestamp: now.toISOString(),
   });
 }
-
-export const POST = verifySignatureAppRouter(handler);

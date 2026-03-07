@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Menu, X, Coins } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -35,7 +36,7 @@ export function Navbar({ user }: NavbarProps) {
   };
 
   return (
-    <header className="fixed top-0 z-50 w-full bg-black/80 backdrop-blur-md border-b border-border">
+    <header className="fixed top-0 z-50 w-full bg-background/80 backdrop-blur-md border-b border-border">
       <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
@@ -46,7 +47,7 @@ export function Navbar({ user }: NavbarProps) {
             height={36}
             className="rounded-lg"
           />
-          <span className="text-xl font-bold font-display tracking-tight text-white">
+          <span className="text-xl font-bold font-display tracking-tight text-foreground">
             Code Hunters
           </span>
         </Link>
@@ -55,20 +56,20 @@ export function Navbar({ user }: NavbarProps) {
         <div className="hidden items-center gap-6 md:flex">
           <Link
             href="/courses"
-            className="text-sm text-muted transition-colors hover:text-white"
+            className="text-sm text-muted transition-colors hover:text-foreground"
           >
             Courses
           </Link>
           <Link
             href="/projects"
-            className="text-sm text-muted transition-colors hover:text-white"
+            className="text-sm text-muted transition-colors hover:text-foreground"
           >
             Projects
           </Link>
           {user && (
             <Link
               href="/dashboard/my-learning"
-              className="text-sm text-muted transition-colors hover:text-white"
+              className="text-sm text-muted transition-colors hover:text-foreground"
             >
               My Learning
             </Link>
@@ -90,20 +91,21 @@ export function Navbar({ user }: NavbarProps) {
               {typeof user.goldCoins === "number" && (
                 <Link
                   href="/dashboard/referral"
-                  className="flex items-center gap-1.5 rounded-full border border-border-light px-3 py-1.5 text-sm text-muted hover:text-white transition-colors"
+                  className="flex items-center gap-1.5 rounded-full border border-border-light px-3 py-1.5 text-sm text-muted hover:text-foreground transition-colors"
                 >
                   <Coins className="h-3.5 w-3.5" />
                   {user.goldCoins}
                 </Link>
               )}
               <Link href="/dashboard/profile">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-semibold text-black">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
                   {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
                 </div>
               </Link>
               <Button variant="ghost" size="sm" onClick={handleSignOut}>
                 Sign Out
               </Button>
+              <ThemeToggle />
             </>
           ) : (
             <>
@@ -115,13 +117,14 @@ export function Navbar({ user }: NavbarProps) {
               <Link href="/register">
                 <Button size="sm">Get Started</Button>
               </Link>
+              <ThemeToggle />
             </>
           )}
         </div>
 
         {/* Mobile Menu Toggle */}
         <button
-          className="md:hidden text-white p-2"
+          className="md:hidden text-foreground p-2"
           onClick={() => setIsOpen(!isOpen)}
           aria-label={isOpen ? "Close menu" : "Open menu"}
         >
@@ -137,19 +140,19 @@ export function Navbar({ user }: NavbarProps) {
           animate={{ opacity: 1, height: "auto" }}
           exit={{ opacity: 0, height: 0 }}
           transition={{ duration: 0.2, ease: "easeInOut" }}
-          className="overflow-hidden border-t border-border bg-black/95 backdrop-blur-md md:hidden"
+          className="overflow-hidden border-t border-border bg-background/95 backdrop-blur-md md:hidden"
         >
           <div className="space-y-1 px-5 pb-5 pt-3">
             <Link
               href="/courses"
-              className="block rounded-lg px-3 py-2.5 text-sm text-muted hover:text-white"
+              className="block rounded-lg px-3 py-2.5 text-sm text-muted hover:text-foreground"
               onClick={() => setIsOpen(false)}
             >
               Courses
             </Link>
             <Link
               href="/projects"
-              className="block rounded-lg px-3 py-2.5 text-sm text-muted hover:text-white"
+              className="block rounded-lg px-3 py-2.5 text-sm text-muted hover:text-foreground"
               onClick={() => setIsOpen(false)}
             >
               Projects
@@ -158,14 +161,14 @@ export function Navbar({ user }: NavbarProps) {
               <>
                 <Link
                   href="/dashboard/my-learning"
-                  className="block rounded-lg px-3 py-2.5 text-sm text-muted hover:text-white"
+                  className="block rounded-lg px-3 py-2.5 text-sm text-muted hover:text-foreground"
                   onClick={() => setIsOpen(false)}
                 >
                   My Learning
                 </Link>
                 <Link
                   href="/dashboard/referral"
-                  className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-muted hover:text-white"
+                  className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-muted hover:text-foreground"
                   onClick={() => setIsOpen(false)}
                 >
                   <Coins className="h-3.5 w-3.5" />
@@ -173,7 +176,7 @@ export function Navbar({ user }: NavbarProps) {
                 </Link>
                 <Link
                   href="/dashboard/profile"
-                  className="block rounded-lg px-3 py-2.5 text-sm text-muted hover:text-white"
+                  className="block rounded-lg px-3 py-2.5 text-sm text-muted hover:text-foreground"
                   onClick={() => setIsOpen(false)}
                 >
                   Profile

@@ -104,14 +104,14 @@ export function RegisterForm({ referralCode }: RegisterFormProps) {
         {/* Logo */}
         <Link href="/" className="mb-8 flex items-center justify-center gap-2.5">
           <Image src="/logo.png" alt="Code Hunters" width={40} height={40} className="rounded-lg" />
-          <span className="text-2xl font-bold font-display text-white">
+          <span className="text-2xl font-bold font-display text-foreground">
             Code Hunters
           </span>
         </Link>
 
         <div className="rounded-2xl border border-border bg-surface p-8">
           <div className="mb-6 text-center">
-            <h1 className="text-2xl font-semibold text-white">Create your account</h1>
+            <h1 className="text-2xl font-semibold text-foreground">Create your account</h1>
             <p className="mt-1.5 text-sm text-muted">
               Join thousands of developers leveling up their skills
             </p>
@@ -167,7 +167,7 @@ export function RegisterForm({ referralCode }: RegisterFormProps) {
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-1.5">
-              <label htmlFor="name" className="text-sm font-medium text-muted">
+              <label htmlFor="name" className="text-sm font-medium text-foreground">
                 Full Name
               </label>
               <Input
@@ -180,7 +180,7 @@ export function RegisterForm({ referralCode }: RegisterFormProps) {
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="email" className="text-sm font-medium text-muted">
+              <label htmlFor="email" className="text-sm font-medium text-foreground">
                 Email
               </label>
               <Input
@@ -193,7 +193,7 @@ export function RegisterForm({ referralCode }: RegisterFormProps) {
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="password" className="text-sm font-medium text-muted">
+              <label htmlFor="password" className="text-sm font-medium text-foreground">
                 Password
               </label>
               <Input
@@ -206,7 +206,7 @@ export function RegisterForm({ referralCode }: RegisterFormProps) {
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="confirmPassword" className="text-sm font-medium text-muted">
+              <label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
                 Confirm Password
               </label>
               <Input
@@ -220,7 +220,7 @@ export function RegisterForm({ referralCode }: RegisterFormProps) {
 
             {/* Referral Code */}
             <div className="space-y-1.5">
-              <label htmlFor="referralCode" className="text-sm font-medium text-muted">
+              <label htmlFor="referralCode" className="text-sm font-medium text-foreground">
                 Referral Code{" "}
                 <span className="text-xs text-muted/60">(optional)</span>
               </label>
@@ -264,7 +264,7 @@ export function RegisterForm({ referralCode }: RegisterFormProps) {
           Already have an account?{" "}
           <Link
             href="/login"
-            className="font-medium text-white hover:text-accent transition-colors"
+            className="font-medium text-foreground hover:text-accent transition-colors"
           >
             Sign in
           </Link>

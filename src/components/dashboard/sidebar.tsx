@@ -51,7 +51,7 @@ export function DashboardSidebar({ profile }: SidebarProps) {
       {/* Profile summary */}
       <div className="border-b border-border/50 p-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
             {profile.avatarUrl ? (
               <Image
                 src={profile.avatarUrl}
@@ -65,7 +65,7 @@ export function DashboardSidebar({ profile }: SidebarProps) {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-white">
+            <p className="truncate text-sm font-semibold text-foreground">
               {profile.name}
             </p>
             <p className="truncate text-xs text-muted">{profile.email}</p>
@@ -98,13 +98,13 @@ export function DashboardSidebar({ profile }: SidebarProps) {
                 "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                 active
                   ? "bg-primary/15 text-primary border border-primary/20"
-                  : "text-muted hover:bg-surface-hover hover:text-white border border-transparent"
+                  : "text-muted hover:bg-surface-hover hover:text-foreground border border-transparent"
               )}
             >
               <Icon
                 className={cn(
                   "h-4.5 w-4.5 shrink-0 transition-colors",
-                  active ? "text-primary" : "text-muted group-hover:text-white"
+                  active ? "text-primary" : "text-muted group-hover:text-foreground"
                 )}
               />
               {item.label}
@@ -137,7 +137,7 @@ export function DashboardSidebar({ profile }: SidebarProps) {
       {/* Mobile hamburger */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="fixed left-4 top-[4.5rem] z-40 rounded-lg border border-border bg-surface p-2 text-white shadow-lg lg:hidden"
+        className="fixed left-4 top-[4.5rem] z-40 rounded-lg border border-border bg-surface p-2 text-foreground shadow-lg lg:hidden"
       >
         <Menu className="h-5 w-5" />
       </button>
@@ -151,7 +151,7 @@ export function DashboardSidebar({ profile }: SidebarProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMobileOpen(false)}
-              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+              className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm lg:hidden"
             />
             <motion.aside
               initial={{ x: -280 }}
@@ -161,10 +161,10 @@ export function DashboardSidebar({ profile }: SidebarProps) {
               className="fixed left-0 top-0 z-50 h-full w-[280px] border-r border-border/50 bg-surface/95 backdrop-blur-xl lg:hidden"
             >
               <div className="flex items-center justify-between border-b border-border/50 px-5 py-4">
-                <span className="text-sm font-bold text-white">Dashboard</span>
+                <span className="text-sm font-bold text-foreground">Dashboard</span>
                 <button
                   onClick={() => setMobileOpen(false)}
-                  className="rounded-lg p-1 text-muted hover:text-white"
+                  className="rounded-lg p-1 text-muted hover:text-foreground"
                 >
                   <X className="h-5 w-5" />
                 </button>

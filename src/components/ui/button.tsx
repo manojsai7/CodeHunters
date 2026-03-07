@@ -3,18 +3,18 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-full text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-full text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
         default:
-          "bg-white text-black hover:bg-white/90",
+          "bg-primary text-primary-foreground hover:bg-primary/90",
         secondary:
-          "bg-surface-light text-white hover:bg-surface-hover border border-border",
+          "bg-surface-light text-foreground hover:bg-surface-hover border border-border",
         outline:
-          "border border-border-light bg-transparent text-white hover:bg-surface-light hover:border-white/20",
-        ghost: "text-muted hover:text-white hover:bg-surface-light",
-        link: "text-white underline-offset-4 hover:underline",
+          "border border-border-light bg-transparent text-foreground hover:bg-surface-light hover:border-foreground/20",
+        ghost: "text-muted hover:text-foreground hover:bg-surface-light",
+        link: "text-foreground underline-offset-4 hover:underline",
         destructive: "bg-error text-white hover:bg-error/80",
         success: "bg-success text-white hover:bg-success/80",
         gold: "bg-gold text-black font-bold hover:bg-gold/80",

@@ -82,7 +82,7 @@ export default function PopularProjects() {
               className="card-interactive flex flex-col gap-4 p-6"
             >
               {/* Title */}
-              <h3 className="text-lg font-semibold font-display leading-snug text-white">
+              <h3 className="text-lg font-semibold font-display leading-snug text-foreground">
                 {project.title}
               </h3>
 
@@ -91,7 +91,7 @@ export default function PopularProjects() {
                 {project.tech.map((t) => (
                   <span
                     key={t}
-                    className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/50"
+                    className="rounded-full bg-foreground/5 px-3 py-1 text-xs text-foreground/50"
                   >
                     {t}
                   </span>
@@ -103,7 +103,7 @@ export default function PopularProjects() {
               {/* Price + downloads */}
               <div className="flex items-end justify-between border-t border-border pt-4">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold font-display text-white">
+                  <span className="text-2xl font-bold font-display text-foreground">
                     ₹{project.price}
                   </span>
                   <span className="text-sm text-muted line-through">₹{project.mrp}</span>

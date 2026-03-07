@@ -68,17 +68,17 @@ export default function Testimonials() {
               className="flex flex-col gap-6 rounded-2xl border border-border bg-surface-light/50 p-8"
             >
               {/* Quote text */}
-              <p className="flex-1 text-[15px] leading-relaxed text-white/70">
+              <p className="flex-1 text-[15px] leading-relaxed text-foreground/70">
                 &ldquo;{t.quote}&rdquo;
               </p>
 
               {/* Author */}
               <div className="flex items-center gap-3 border-t border-border pt-6">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-foreground/10 text-sm font-semibold text-foreground">
                   {t.name.split(" ").map((n) => n[0]).join("")}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white">{t.name}</p>
+                  <p className="text-sm font-medium text-foreground">{t.name}</p>
                   <p className="text-xs text-muted">{t.role}</p>
                 </div>
               </div>
