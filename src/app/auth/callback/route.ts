@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createReferralCode, recordReferral } from "@/lib/referral";
+import { sendWelcomeEmail } from "@/lib/email";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -61,6 +62,18 @@ export async function GET(request: Request) {
           // Record referral if code was provided
           if (ref) {
             await recordReferral(ref, user.id, name);
+          }
+
+          // Send welcome email + log it
+          if (user.email) {
+            sendWelcomeEmail(user.email, name, referralCode);
+            prisma.emailLog
+              .create({
+                data: { userId: user.id, emailType: "welcome" },
+              })
+              .catch((err: unknown) =>
+                console.error("Failed to log welcome email:", err)
+              );
           }
         }
       }

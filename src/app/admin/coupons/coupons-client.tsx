@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { DataTable, Column } from "@/components/admin/data-table";
-import { Plus, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
+import { Plus, Trash2, ToggleLeft, ToggleRight, Send } from "lucide-react";
 
 interface CouponRow {
   id: string;
@@ -30,6 +30,13 @@ export function CouponsClient({ data }: { data: CouponRow[] }) {
   const [loading, setLoading] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [showCampaign, setShowCampaign] = useState(false);
+  const [sendingCampaign, setSendingCampaign] = useState(false);
+  const [campaignForm, setCampaignForm] = useState({
+    discountPercent: 10,
+    expiryDays: 30,
+    targetSegment: "all" as "all" | "inactive",
+  });
 
   // New coupon form
   const [form, setForm] = useState({
@@ -93,6 +100,31 @@ export function CouponsClient({ data }: { data: CouponRow[] }) {
       toast.error(err instanceof Error ? err.message : "Failed");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const sendCampaign = async () => {
+    setSendingCampaign(true);
+    try {
+      const res = await fetch("/api/admin/coupons/campaign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(campaignForm),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to send campaign");
+      }
+      const result = await res.json();
+      toast.success(
+        `Campaign sent! ${result.sent} emails delivered to ${result.total} users.`
+      );
+      setShowCampaign(false);
+      router.refresh();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Campaign failed");
+    } finally {
+      setSendingCampaign(false);
     }
   };
 
@@ -249,6 +281,64 @@ export function CouponsClient({ data }: { data: CouponRow[] }) {
         </div>
       )}
 
+      {/* Campaign form */}
+      {showCampaign && (
+        <div className="rounded-xl border border-secondary/20 bg-surface p-6 space-y-4">
+          <h3 className="text-sm font-semibold text-white">
+            Send Coupon Campaign
+          </h3>
+          <p className="text-xs text-muted">
+            Generate unique coupons and email them to selected users.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Input
+              type="number"
+              placeholder="Discount %"
+              value={campaignForm.discountPercent}
+              onChange={(e) =>
+                setCampaignForm({
+                  ...campaignForm,
+                  discountPercent: parseInt(e.target.value) || 0,
+                })
+              }
+            />
+            <Input
+              type="number"
+              placeholder="Expiry (days)"
+              value={campaignForm.expiryDays}
+              onChange={(e) =>
+                setCampaignForm({
+                  ...campaignForm,
+                  expiryDays: parseInt(e.target.value) || 1,
+                })
+              }
+            />
+            <Select
+              value={campaignForm.targetSegment}
+              onChange={(e) =>
+                setCampaignForm({
+                  ...campaignForm,
+                  targetSegment: e.target.value as "all" | "inactive",
+                })
+              }
+              options={[
+                { value: "all", label: "All Users" },
+                { value: "inactive", label: "Inactive (no purchase in 30d)" },
+              ]}
+            />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setShowCampaign(false)}>
+              Cancel
+            </Button>
+            <Button onClick={sendCampaign} isLoading={sendingCampaign}>
+              <Send className="mr-2 h-4 w-4" />
+              Send Campaign
+            </Button>
+          </div>
+        </div>
+      )}
+
       <DataTable
         columns={columns}
         data={data}
@@ -258,10 +348,19 @@ export function CouponsClient({ data }: { data: CouponRow[] }) {
         emptyMessage="No coupons found"
         actions={
           !showForm ? (
-            <Button onClick={() => setShowForm(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Coupon
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={() => setShowForm(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                New Coupon
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setShowCampaign(!showCampaign)}
+              >
+                <Send className="mr-2 h-4 w-4" />
+                Send Campaign
+              </Button>
+            </div>
           ) : undefined
         }
       />

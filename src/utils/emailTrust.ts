@@ -76,7 +76,6 @@ export function classifyEmail(email: string): EmailTrustLevel {
   if (TEMP_MAIL_DOMAINS.includes(domain)) return "blocked";
   if (CONSUMER_EMAIL_DOMAINS.includes(domain)) return "consumer";
   // Unknown domain treated as potential student/institutional
-  // n8n workflow determines if suspicious via domain age check
   return "student";
 }
 

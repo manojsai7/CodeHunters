@@ -13,6 +13,7 @@ import {
   Save,
   CheckCircle2,
   AlertCircle,
+  KeyRound,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,10 @@ interface FormData {
 export function ProfileForm({ profile }: ProfileFormProps) {
   const [saving, setSaving] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [studentEmailInput, setStudentEmailInput] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpInput, setOtpInput] = useState("");
 
   const {
     register,
@@ -81,23 +86,62 @@ export function ProfileForm({ profile }: ProfileFormProps) {
   };
 
   const handleVerifyEmail = async () => {
+    if (!studentEmailInput) {
+      toast.error("Please enter your student email");
+      return;
+    }
     setVerifying(true);
     try {
       const res = await fetch("/api/student/verify-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: studentEmailInput }),
       });
 
-      if (res.ok) {
-        toast.success("Verification email sent! Check your student inbox.");
+      const data = await res.json();
+
+      if (data.status === "otp_sent") {
+        setOtpSent(true);
+        toast.success("OTP sent! Check your student email inbox.");
+      } else if (data.status === "not_eligible") {
+        toast.error(data.message || "Not an educational email.");
+      } else if (data.status === "blocked") {
+        toast.error(data.message || "This email domain is not allowed.");
       } else {
-        const err = await res.json();
-        toast.error(err.error || "Failed to send verification email.");
+        toast.error(data.error || "Failed to send verification email.");
       }
     } catch {
       toast.error("Something went wrong.");
     } finally {
       setVerifying(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpInput || otpInput.length !== 6) {
+      toast.error("Please enter the 6-digit OTP");
+      return;
+    }
+    setVerifyingOtp(true);
+    try {
+      const res = await fetch("/api/student/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ otp: otpInput }),
+      });
+
+      const data = await res.json();
+
+      if (data.verified) {
+        toast.success("Student email verified! 🎉 20% discount unlocked.");
+        window.location.reload();
+      } else {
+        toast.error(data.error || "Invalid OTP.");
+      }
+    } catch {
+      toast.error("Something went wrong.");
+    } finally {
+      setVerifyingOtp(false);
     }
   };
 
@@ -243,7 +287,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
               </Badge>
             </motion.div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="flex items-start gap-3 rounded-lg bg-gold/5 border border-gold/20 px-4 py-3">
                 <AlertCircle className="h-5 w-5 text-gold shrink-0 mt-0.5" />
                 <div>
@@ -256,16 +300,68 @@ export function ProfileForm({ profile }: ProfileFormProps) {
                   </p>
                 </div>
               </div>
-              <Button
-                variant="secondary"
-                onClick={handleVerifyEmail}
-                disabled={verifying}
-                isLoading={verifying}
-                className="gap-2"
-              >
-                <Mail className="h-4 w-4" />
-                Verify Student Email
-              </Button>
+
+              {!otpSent ? (
+                <div className="space-y-3">
+                  <Input
+                    placeholder="your-name@university.edu"
+                    value={studentEmailInput}
+                    onChange={(e) => setStudentEmailInput(e.target.value)}
+                    type="email"
+                  />
+                  <Button
+                    variant="secondary"
+                    onClick={handleVerifyEmail}
+                    disabled={verifying}
+                    isLoading={verifying}
+                    className="gap-2"
+                  >
+                    <Mail className="h-4 w-4" />
+                    Send Verification OTP
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted">
+                    OTP sent to{" "}
+                    <span className="text-white font-medium">
+                      {studentEmailInput}
+                    </span>
+                    . Enter the 6-digit code below:
+                  </p>
+                  <Input
+                    placeholder="Enter 6-digit OTP"
+                    value={otpInput}
+                    onChange={(e) =>
+                      setOtpInput(
+                        e.target.value.replace(/\D/g, "").slice(0, 6)
+                      )
+                    }
+                    maxLength={6}
+                    className="text-center tracking-[0.5em] text-lg font-mono"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleVerifyOtp}
+                      disabled={verifyingOtp || otpInput.length !== 6}
+                      isLoading={verifyingOtp}
+                      className="gap-2"
+                    >
+                      <KeyRound className="h-4 w-4" />
+                      Verify OTP
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setOtpSent(false);
+                        setOtpInput("");
+                      }}
+                    >
+                      Change Email
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

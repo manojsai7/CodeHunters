@@ -20,6 +20,8 @@ model Profile {
   studentEmail    String?       @map("student_email")
   phone           String?
   state           String?
+  otpCode         String?       @map("otp_code")
+  otpExpiresAt    DateTime?     @map("otp_expires_at")
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
@@ -27,6 +29,7 @@ model Profile {
   purchases       Purchase[]
   coupons         Coupon[]
   progress        LessonProgress[]
+  emailLogs       EmailLog[]
 
   @@map("profiles")
 }
@@ -133,6 +136,9 @@ model Purchase {
   razorpayOrderId     String   @unique @map("razorpay_order_id")
   razorpayPaymentId   String?  @map("razorpay_payment_id")
   status              String   @default("pending")
+  invoiceNumber       String?  @unique @map("invoice_number")
+  invoiceDate         DateTime? @map("invoice_date")
+  gstData             Json?    @map("gst_data")
   createdAt           DateTime @default(now()) @map("created_at")
 
   profile             Profile? @relation(fields: [userId], references: [userId])
@@ -161,6 +167,9 @@ model GuestPurchase {
   referralCodeUsed    String?   @map("referral_code_used")
   referralEligible    Boolean   @default(false) @map("referral_eligible")
   status              String    @default("pending")
+  invoiceNumber       String?   @unique @map("invoice_number")
+  invoiceDate         DateTime? @map("invoice_date")
+  gstData             Json?     @map("gst_data")
   createdAt           DateTime  @default(now()) @map("created_at")
 
   @@map("guest_purchases")
@@ -226,4 +235,30 @@ model Review {
 
   @@unique([userId, courseId])
   @@map("reviews")
+}
+
+model PaymentAttempt {
+  id              String   @id @default(uuid())
+  guestEmail      String   @map("guest_email")
+  guestName       String   @map("guest_name")
+  productId       String   @map("product_id")
+  productType     String   @map("product_type")
+  amount          Int
+  razorpayOrderId String   @map("razorpay_order_id")
+  failureReason   String?  @map("failure_reason")
+  status          String   @default("failed")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("payment_attempts")
+}
+
+model EmailLog {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  emailType String   @map("email_type")
+  sentAt    DateTime @default(now()) @map("sent_at")
+
+  profile   Profile  @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("email_logs")
 }

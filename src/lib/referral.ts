@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { generateReferralCode } from "@/lib/utils";
+import { sendReferralRewardEmail } from "@/lib/email";
 import {
   REFERRAL_COINS_PER_PURCHASE,
   COINS_FOR_COUPON_THRESHOLD,
@@ -112,56 +113,16 @@ export async function creditReferralCoins(
           },
         });
 
-        // Fire n8n webhook for reward notification
-        await triggerN8nWebhook("referral-reward", {
-          userId: referralUse.referrerId,
+        // Send reward notification via Resend
+        sendReferralRewardEmail(
+          referralUse.referrer.email,
+          referralUse.referrer.name,
           couponCode,
-          goldCoins: updatedProfile.goldCoins,
-          email: referralUse.referrer.email,
-          name: referralUse.referrer.name,
-        });
+          updatedProfile.goldCoins
+        );
       }
     }
   } catch (error) {
     console.error("Error crediting referral coins:", error);
-  }
-}
-
-export async function triggerN8nWebhook(
-  webhookType: string,
-  payload: Record<string, unknown>
-): Promise<void> {
-  const baseUrl = process.env.N8N_WEBHOOK_BASE_URL;
-  if (!baseUrl) {
-    console.warn("N8N_WEBHOOK_BASE_URL not configured");
-    return;
-  }
-
-  const webhookMap: Record<string, string | undefined> = {
-    enrollment: process.env.N8N_ENROLLMENT_WEBHOOK,
-    "student-otp": process.env.N8N_STUDENT_OTP_WEBHOOK,
-    "referral-reward": process.env.N8N_REFERRAL_REWARD_WEBHOOK,
-    onboarding: process.env.N8N_ONBOARDING_WEBHOOK,
-    "coupon-campaign": process.env.N8N_COUPON_CAMPAIGN_WEBHOOK,
-  };
-
-  const webhookId = webhookMap[webhookType];
-  if (!webhookId) {
-    console.warn(`No webhook configured for type: ${webhookType}`);
-    return;
-  }
-
-  try {
-    await fetch(`${baseUrl}/${webhookId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...payload,
-        timestamp: new Date().toISOString(),
-        type: webhookType,
-      }),
-    });
-  } catch (error) {
-    console.error(`Failed to trigger n8n webhook (${webhookType}):`, error);
   }
 }
