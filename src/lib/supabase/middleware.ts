@@ -22,9 +22,10 @@ export async function updateSession(request: NextRequest) {
     request: { headers: request.headers },
   });
 
-  // Canonical host redirect: www -> apex
-  const host = request.headers.get("host") || "";
-  if (host.startsWith("www.")) {
+  // Canonical host redirect: only redirect www.codehunters.dev -> codehunters.dev.
+  // Avoid redirecting arbitrary "www.*" hosts (e.g. preview/testing domains).
+  const host = (request.headers.get("host") || "").toLowerCase();
+  if (host === `www.${CANONICAL_HOST}`) {
     const url = request.nextUrl.clone();
     url.host = CANONICAL_HOST;
     url.port = "";
@@ -65,9 +66,16 @@ export async function updateSession(request: NextRequest) {
   // Always use getUser() instead of getSession() for server-side auth validation.
   // getSession() reads from the cookie without server-side verification and is
   // not safe for protecting routes — see Supabase SSR docs.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user: { id: string } | null = null;
+  try {
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+    user = authUser;
+  } catch {
+    // Don't fail the entire request when auth provider is temporarily unavailable.
+    user = null;
+  }
 
   // Protect dashboard routes
   if (request.nextUrl.pathname.startsWith("/dashboard") && !user) {
@@ -86,11 +94,17 @@ export async function updateSession(request: NextRequest) {
     }
 
     // Check admin role via profile
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("user_id", user.id)
-      .single();
+    let profile: { role: string } | null = null;
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("user_id", user.id)
+        .single();
+      profile = data;
+    } catch {
+      profile = null;
+    }
 
     if (!profile || profile.role !== "admin") {
       const url = request.nextUrl.clone();
