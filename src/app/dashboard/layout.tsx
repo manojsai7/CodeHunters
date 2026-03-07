@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
@@ -82,7 +83,7 @@ export default async function DashboardLayout({
         <div className="text-center">
           <h1 className="text-xl font-bold text-white">Something went wrong</h1>
           <p className="mt-2 text-muted">We couldn&apos;t load the dashboard. Please try again.</p>
-          <a href="/" className="mt-4 inline-block text-accent hover:underline">Go to homepage</a>
+          <Link href="/" className="mt-4 inline-block text-accent hover:underline">Go to homepage</Link>
         </div>
       </div>
     );
