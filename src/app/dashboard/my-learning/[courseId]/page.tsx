@@ -95,6 +95,11 @@ export default async function CoursePlayerPage({
   );
   } catch (e: unknown) {
     if (e && typeof e === 'object' && 'digest' in e) throw e;
-    redirect("/login?error=true");
+    console.error("[course-player] Failed to load:", e);
+    return (
+      <div className="flex items-center justify-center py-16">
+        <p className="text-muted">Something went wrong loading this course. Please try again later.</p>
+      </div>
+    );
   }
 }

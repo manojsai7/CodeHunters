@@ -46,6 +46,11 @@ export default async function ProfilePage() {
   );
   } catch (e: unknown) {
     if (e && typeof e === 'object' && 'digest' in e) throw e;
-    redirect("/login?error=true");
+    console.error("[profile] Failed to load data:", e);
+    return (
+      <div className="flex items-center justify-center py-16">
+        <p className="text-muted">Something went wrong loading your profile. Please try again later.</p>
+      </div>
+    );
   }
 }

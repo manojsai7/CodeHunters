@@ -46,8 +46,9 @@ export function LoginForm() {
 
       toast.success("Welcome back!");
       const redirectTo = searchParams.get("redirect") || "/dashboard/my-learning";
-      router.push(redirectTo);
-      router.refresh();
+      // Full page navigation ensures the middleware sees the fresh auth cookies.
+      // router.push() does a client-side fetch that can race the cookie write.
+      window.location.href = redirectTo;
     } catch {
       toast.error("Something went wrong. Please try again.");
     } finally {

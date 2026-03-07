@@ -76,8 +76,15 @@ export default async function DashboardLayout({
   } catch (e: unknown) {
     // Rethrow Next.js redirect/not-found errors (they carry a 'digest' property).
     if (e && typeof e === 'object' && 'digest' in e) throw e;
-    // For unexpected errors (e.g. DB unreachable), redirect with ?error=true so
-    // the middleware does NOT bounce the user back to the dashboard and loop.
-    redirect("/login?error=true");
+    console.error("[dashboard/layout] Failed to load:", e);
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <h1 className="text-xl font-bold text-white">Something went wrong</h1>
+          <p className="mt-2 text-muted">We couldn&apos;t load the dashboard. Please try again.</p>
+          <a href="/" className="mt-4 inline-block text-accent hover:underline">Go to homepage</a>
+        </div>
+      </div>
+    );
   }
 }

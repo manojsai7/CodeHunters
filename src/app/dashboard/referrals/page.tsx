@@ -33,7 +33,7 @@ export default async function ReferralsPage() {
   const profile = await prisma.profile.findUnique({
     where: { userId: user.id },
   });
-  if (!profile) redirect("/login?error=true");
+  if (!profile) redirect("/dashboard/my-learning");
 
   const referrals = await prisma.referralUse.findMany({
     where: { referrerId: user.id },
@@ -270,6 +270,11 @@ export default async function ReferralsPage() {
   );
   } catch (e: unknown) {
     if (e && typeof e === 'object' && 'digest' in e) throw e;
-    redirect("/login?error=true");
+    console.error("[referrals] Failed to load data:", e);
+    return (
+      <div className="flex items-center justify-center py-16">
+        <p className="text-muted">Something went wrong loading referrals. Please try again later.</p>
+      </div>
+    );
   }
 }
