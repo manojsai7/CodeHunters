@@ -244,7 +244,8 @@ export async function POST(request: NextRequest) {
             }).catch((err) =>
               console.error("Discord webhook failed:", err)
             );
-          }         } // end if (guestUpdated > 0)        }
+          }         } // end if (guestUpdated > 0)
+        } // end if (guestPurchase && status !== "completed")
 
         break;
       }
