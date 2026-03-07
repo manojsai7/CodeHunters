@@ -22,7 +22,7 @@ import { getUser } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 type CourseWithRelations = Awaited<ReturnType<typeof getCourseWithRelations>>;
 

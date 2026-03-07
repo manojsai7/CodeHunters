@@ -35,6 +35,15 @@ export function generateReferralCode(): string {
   return code;
 }
 
+/** Safely parse JSON from a Request. Returns null on malformed input. */
+export async function safeJsonParse(request: Request): Promise<unknown | null> {
+  try {
+    return await request.json();
+  } catch {
+    return null;
+  }
+}
+
 export function calculateDiscount(
   originalPrice: number,
   isStudent: boolean,

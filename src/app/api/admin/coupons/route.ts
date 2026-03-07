@@ -18,6 +18,7 @@ export async function GET() {
 
     const coupons = await prisma.coupon.findMany({
       orderBy: { createdAt: "desc" },
+      take: 200,
     });
 
     return NextResponse.json(coupons);

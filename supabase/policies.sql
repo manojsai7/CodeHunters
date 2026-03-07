@@ -41,9 +41,11 @@ CREATE POLICY "Admin can read all profiles"
   );
 
 -- Auto-create profile on signup (via trigger)
-CREATE POLICY "Service role can insert profiles"
+-- Profile is auto-created on signup via service_role (bypasses RLS).
+-- Users can only insert their own profile row.
+CREATE POLICY "Users can insert own profile"
   ON profiles FOR INSERT
-  WITH CHECK (true);
+  WITH CHECK (auth.uid()::text = user_id);
 
 -- =====================================================
 -- COURSES
@@ -122,10 +124,16 @@ CREATE POLICY "Users view own purchases"
   USING (auth.uid()::text = user_id);
 
 -- Service role can create/update purchases (via API)
-CREATE POLICY "Service can manage purchases"
-  ON purchases FOR ALL
-  USING (true)
-  WITH CHECK (true);
+-- NOTE: service_role already bypasses RLS. This policy is scoped to
+-- authenticated users creating their own purchases only.
+CREATE POLICY "Users can insert own purchases"
+  ON purchases FOR INSERT
+  WITH CHECK (auth.uid()::text = user_id);
+
+CREATE POLICY "Users can update own purchases"
+  ON purchases FOR UPDATE
+  USING (auth.uid()::text = user_id)
+  WITH CHECK (auth.uid()::text = user_id);
 
 -- Admin can view all purchases
 CREATE POLICY "Admin can view all purchases"
@@ -149,11 +157,15 @@ CREATE POLICY "Admin can view guest purchases"
     )
   );
 
--- Service role can manage guest purchases
-CREATE POLICY "Service can manage guest purchases"
+-- Guest purchases are managed exclusively via service_role (Prisma),
+-- which bypasses RLS. No permissive policy needed for anon/authenticated.
+CREATE POLICY "Admin can manage guest purchases"
   ON guest_purchases FOR ALL
-  USING (true)
-  WITH CHECK (true);
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles WHERE user_id = auth.uid()::text AND role = 'admin'
+    )
+  );
 
 -- =====================================================
 -- REFERRAL USES
@@ -166,10 +178,11 @@ CREATE POLICY "Users view own referrals"
     auth.uid()::text = referrer_id OR auth.uid()::text = referred_id
   );
 
--- Service role can create referral uses
-CREATE POLICY "Service can create referrals"
+-- Referral uses are created via service_role (Prisma) which bypasses RLS.
+-- Only allow authenticated users to insert referrals where they are the referred user.
+CREATE POLICY "Users can create own referrals"
   ON referral_uses FOR INSERT
-  WITH CHECK (true);
+  WITH CHECK (auth.uid()::text = referred_id);
 
 -- =====================================================
 -- COUPONS
@@ -193,10 +206,8 @@ CREATE POLICY "Admin can manage coupons"
 -- PRE-CHECKOUT LEADS
 -- =====================================================
 
--- Service role can insert leads
-CREATE POLICY "Service can insert leads"
-  ON pre_checkout_leads FOR INSERT
-  WITH CHECK (true);
+-- Pre-checkout leads are inserted via service_role (Prisma) which bypasses RLS.
+-- No permissive INSERT needed for anon/authenticated — deny by default.
 
 -- Admin can view all leads
 CREATE POLICY "Admin can view leads"

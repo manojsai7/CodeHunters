@@ -1,10 +1,21 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const CANONICAL_HOST = "codehunters.dev";
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({
     request: { headers: request.headers },
   });
+
+  // Canonical host redirect: www -> apex
+  const host = request.headers.get("host") || "";
+  if (host.startsWith("www.")) {
+    const url = request.nextUrl.clone();
+    url.host = CANONICAL_HOST;
+    url.port = "";
+    return NextResponse.redirect(url, 301);
+  }
 
   // Skip auth checks if Supabase is not configured
   if (
@@ -37,6 +48,9 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
+  // Always use getUser() instead of getSession() for server-side auth validation.
+  // getSession() reads from the cookie without server-side verification and is
+  // not safe for protecting routes — see Supabase SSR docs.
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -81,6 +95,11 @@ export async function updateSession(request: NextRequest) {
     url.pathname = "/dashboard/my-learning";
     return NextResponse.redirect(url);
   }
+
+  // Add security headers
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
 
   return response;
 }

@@ -9,7 +9,7 @@ import PricingSection from "@/components/landing/pricing-section";
 import { getUser } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 export default async function HomePage() {
   let userData = null;

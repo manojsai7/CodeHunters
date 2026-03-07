@@ -1,0 +1,9 @@
+# https://codehunters.dev/robots.txt
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+
+Sitemap: https://codehunters.dev/sitemap.xml

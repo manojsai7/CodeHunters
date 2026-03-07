@@ -3,6 +3,8 @@ import prisma from "@/lib/prisma";
 import { getUser } from "@/lib/supabase/server";
 import { classifyEmail } from "@/utils/emailTrust";
 import { sendStudentOtpEmail } from "@/lib/email";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { safeJsonParse } from "@/lib/utils";
 import { z } from "zod";
 
 const verifyEmailSchema = z.object({
@@ -11,6 +13,16 @@ const verifyEmailSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 3 OTP sends per 15 minutes per IP
+    const ip = getClientIp(request);
+    const rl = checkRateLimit(`verify-email:${ip}`, 3, 15 * 60 * 1000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+      );
+    }
+
     const user = await getUser();
     if (!user) {
       return NextResponse.json(
@@ -19,7 +31,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    const body = await safeJsonParse(request);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
     const parsed = verifyEmailSchema.safeParse(body);
 
     if (!parsed.success) {

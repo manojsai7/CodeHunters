@@ -2,8 +2,6 @@ import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/server";
 import { LoginForm } from "@/components/auth/login-form";
 
-export const dynamic = 'force-dynamic';
-
 export const metadata = {
   title: "Sign In | Code Hunters",
   description:

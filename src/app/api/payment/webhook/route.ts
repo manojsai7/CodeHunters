@@ -11,6 +11,10 @@ import {
 import { generateInvoiceNumber } from "@/lib/invoice";
 import { calculateGST } from "@/lib/gst";
 
+// In-memory set for webhook event deduplication (survives within warm instance)
+const processedEvents = new Set<string>();
+const MAX_PROCESSED_EVENTS = 10000;
+
 export async function POST(request: NextRequest) {
   try {
     const rawBody = await request.text();
@@ -34,6 +38,22 @@ export async function POST(request: NextRequest) {
     const event = JSON.parse(rawBody);
     const eventType = event.event as string;
     const payload = event.payload;
+
+    // Idempotency: deduplicate by Razorpay event ID
+    const eventId = event.account_id && event.payload?.payment?.entity?.id
+      ? `${eventType}:${event.payload.payment.entity.id}`
+      : `${eventType}:${JSON.stringify(event).substring(0, 64)}`;
+
+    if (processedEvents.has(eventId)) {
+      return NextResponse.json({ ok: true, message: "Duplicate event ignored" });
+    }
+
+    // Evict oldest entries if set grows too large
+    if (processedEvents.size >= MAX_PROCESSED_EVENTS) {
+      const first = processedEvents.values().next().value;
+      if (first) processedEvents.delete(first);
+    }
+    processedEvents.add(eventId);
 
     switch (eventType) {
       case "payment.captured": {

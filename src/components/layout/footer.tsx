@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Github, Twitter, Linkedin, Mail } from "lucide-react";
+import { Mail } from "lucide-react";
 
 export function Footer() {
   return (
@@ -19,21 +19,13 @@ export function Footer() {
               ready-to-use developer projects.
             </p>
             <div className="flex gap-3">
-              {[
-                { icon: Github, label: "GitHub", href: "#" },
-                { icon: Twitter, label: "Twitter", href: "#" },
-                { icon: Linkedin, label: "LinkedIn", href: "#" },
-                { icon: Mail, label: "Email", href: "mailto:hello@codehunters.dev" },
-              ].map((social) => (
-                <a
-                  key={social.label}
-                  href={social.href}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted hover:text-foreground hover:border-foreground/30 transition-all duration-300"
-                  aria-label={social.label}
-                >
-                  <social.icon className="h-4 w-4" />
-                </a>
-              ))}
+              <a
+                href="mailto:hello@codehunters.dev"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted hover:text-foreground hover:border-foreground/30 transition-all duration-300"
+                aria-label="Email"
+              >
+                <Mail className="h-4 w-4" />
+              </a>
             </div>
           </div>
 
@@ -87,28 +79,20 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Company */}
+          {/* Contact */}
           <div>
             <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-foreground">
-              Company
+              Contact
             </h3>
             <ul className="space-y-2.5">
-              {[
-                { label: "About Us", href: "#" },
-                { label: "Contact", href: "#" },
-                { label: "Privacy Policy", href: "#" },
-                { label: "Terms of Service", href: "#" },
-                { label: "Refund Policy", href: "#" },
-              ].map((item) => (
-                <li key={item.label}>
-                  <Link
-                    href={item.href}
-                    className="text-sm text-muted hover:text-white transition-colors"
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
+              <li>
+                <a
+                  href="mailto:hello@codehunters.dev"
+                  className="text-sm text-muted hover:text-foreground transition-colors"
+                >
+                  hello@codehunters.dev
+                </a>
+              </li>
             </ul>
           </div>
         </div>

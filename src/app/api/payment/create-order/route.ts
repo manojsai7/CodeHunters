@@ -4,6 +4,7 @@ import { getUser } from "@/lib/supabase/server";
 import { getRazorpay } from "@/lib/razorpay";
 import { createOrderSchema } from "@/lib/validations";
 import { classifyEmail, isBlockedEmail } from "@/utils/emailTrust";
+import { safeJsonParse } from "@/lib/utils";
 import {
   STUDENT_DISCOUNT_PERCENT,
   MAX_TOTAL_DISCOUNT_PERCENT,
@@ -11,7 +12,10 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await safeJsonParse(request);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
     const parsed = createOrderSchema.safeParse(body);
 
     if (!parsed.success) {

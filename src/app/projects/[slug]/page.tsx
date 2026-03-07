@@ -24,7 +24,7 @@ import { getUser } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 type ProjectItem = Awaited<ReturnType<typeof prisma.project.findMany>>[number];
 

@@ -91,6 +91,7 @@ export default async function CoursesPage({ searchParams: searchParamsPromise }:
     courses = await prisma.course.findMany({
       where,
       orderBy,
+      take: 50,
       select: {
         id: true,
         slug: true,

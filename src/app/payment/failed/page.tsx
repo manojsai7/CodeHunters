@@ -1,13 +1,13 @@
-import { Metadata } from "next";
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { XCircle, RefreshCw, MessageCircle, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export const metadata: Metadata = {
-  title: "Payment Failed | Code Hunters",
-};
-
 export default function PaymentFailedPage() {
+  const router = useRouter();
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="max-w-md w-full text-center space-y-6">
@@ -49,14 +49,12 @@ export default function PaymentFailedPage() {
         </div>
 
         <div className="space-y-3">
-          <Link href="javascript:history.back()" className="block">
-            <Button className="w-full" size="lg">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Try Again
-            </Button>
-          </Link>
+          <Button className="w-full" size="lg" onClick={() => router.back()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Try Again
+          </Button>
 
-          <a href="mailto:support@codehunters.in" className="block">
+          <a href="mailto:support@codehunters.dev" className="block">
             <Button variant="outline" className="w-full">
               <MessageCircle className="h-4 w-4 mr-2" />
               Contact Support

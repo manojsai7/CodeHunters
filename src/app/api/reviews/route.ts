@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUser } from "@/lib/supabase/server";
 import { z } from "zod";
+import { safeJsonParse } from "@/lib/utils";
 
 const createReviewSchema = z.object({
   courseId: z.string().uuid(),
@@ -19,7 +20,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    const body = await safeJsonParse(request);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
     const parsed = createReviewSchema.safeParse(body);
 
     if (!parsed.success) {
@@ -132,6 +136,7 @@ export async function GET(request: NextRequest) {
     const reviews = await prisma.review.findMany({
       where: { courseId },
       orderBy: { createdAt: "desc" },
+      take: 50,
     });
 
     return NextResponse.json(reviews);

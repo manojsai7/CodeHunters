@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
+import { safeJsonParse } from "@/lib/utils";
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,8 +10,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { lessonId, courseId, isCompleted } = body;
+    const body = await safeJsonParse(request);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+    const { lessonId, courseId, isCompleted } = body as { lessonId?: string; courseId?: string; isCompleted?: boolean };
 
     if (!lessonId || !courseId) {
       return NextResponse.json(

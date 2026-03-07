@@ -90,6 +90,7 @@ export default async function ProjectsPage({ searchParams: searchParamsPromise }
     projects = await prisma.project.findMany({
       where,
       orderBy,
+      take: 50,
       select: {
         id: true,
         slug: true,

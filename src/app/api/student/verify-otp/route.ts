@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUser } from "@/lib/supabase/server";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { safeJsonParse } from "@/lib/utils";
 import { z } from "zod";
 
 const verifyOtpSchema = z.object({
@@ -9,6 +11,16 @@ const verifyOtpSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 5 attempts per 10 minutes per IP
+    const ip = getClientIp(request);
+    const rl = checkRateLimit(`otp:${ip}`, 5, 10 * 60 * 1000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many attempts. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+      );
+    }
+
     const user = await getUser();
     if (!user) {
       return NextResponse.json(
@@ -17,7 +29,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    const body = await safeJsonParse(request);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
     const parsed = verifyOtpSchema.safeParse(body);
 
     if (!parsed.success) {

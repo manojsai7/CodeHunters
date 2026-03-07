@@ -5,8 +5,6 @@ import { Button } from "@/components/ui/button";
 import prisma from "@/lib/prisma";
 import { formatPrice } from "@/lib/utils";
 
-export const dynamic = 'force-dynamic';
-
 export const metadata: Metadata = {
   title: "Payment Successful | Code Hunters",
 };

@@ -10,10 +10,14 @@ import {
 } from "@/lib/email";
 import { generateInvoiceNumber } from "@/lib/invoice";
 import { calculateGST } from "@/lib/gst";
+import { safeJsonParse } from "@/lib/utils";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await safeJsonParse(request);
+    if (!body) {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
     const parsed = verifyPaymentSchema.safeParse(body);
 
     if (!parsed.success) {
