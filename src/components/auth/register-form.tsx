@@ -41,10 +41,13 @@ export function RegisterForm({ referralCode }: RegisterFormProps) {
   const onSubmit = async (data: RegisterFormData) => {
     setIsLoading(true);
     try {
+      const emailRedirectTo = `${window.location.origin}/auth/confirm`;
+
       const { error } = await getSupabase().auth.signUp({
         email: data.email,
         password: data.password,
         options: {
+          emailRedirectTo,
           data: {
             name: data.name,
             referral_code: data.referralCode || undefined,

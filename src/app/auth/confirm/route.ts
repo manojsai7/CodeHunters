@@ -2,6 +2,9 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import prisma from "@/lib/prisma";
+import { createReferralCode, recordReferral } from "@/lib/referral";
+import { sendWelcomeEmail } from "@/lib/email";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -34,7 +37,51 @@ export async function GET(request: Request) {
     });
 
     if (!error) {
-      return NextResponse.redirect(`${origin}/dashboard`);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        const existingProfile = await prisma.profile.findUnique({
+          where: { userId: user.id },
+        });
+
+        if (!existingProfile) {
+          const referralCode = await createReferralCode();
+          const name =
+            user.user_metadata?.full_name ||
+            user.user_metadata?.name ||
+            user.email?.split("@")[0] ||
+            "User";
+
+          await prisma.profile.create({
+            data: {
+              userId: user.id,
+              email: user.email || "",
+              name,
+              referralCode,
+            },
+          });
+
+          const ref = user.user_metadata?.referral_code as string | undefined;
+          if (ref) {
+            await recordReferral(ref, user.id, name);
+          }
+
+          if (user.email) {
+            sendWelcomeEmail(user.email, name, referralCode);
+            prisma.emailLog
+              .create({
+                data: { userId: user.id, emailType: "welcome" },
+              })
+              .catch((err: unknown) =>
+                console.error("Failed to log welcome email:", err)
+              );
+          }
+        }
+      }
+
+      return NextResponse.redirect(`${origin}/dashboard/my-learning`);
     }
   }
 
