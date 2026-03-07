@@ -111,7 +111,7 @@
   }
 
   .card-base {
-    @apply rounded-2xl border border-border bg-surface-light/50 backdrop-blur-sm transition-all duration-300;
+    @apply rounded-2xl border border-border bg-surface-light backdrop-blur-sm transition-all duration-300;
   }
 
   .card-interactive {
