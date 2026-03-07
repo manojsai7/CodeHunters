@@ -33,7 +33,7 @@ export default async function ReferralsPage() {
   const profile = await prisma.profile.findUnique({
     where: { userId: user.id },
   });
-  if (!profile) redirect("/login");
+  if (!profile) redirect("/login?error=true");
 
   const referrals = await prisma.referralUse.findMany({
     where: { referrerId: user.id },
@@ -270,6 +270,6 @@ export default async function ReferralsPage() {
   );
   } catch (e: unknown) {
     if (e && typeof e === 'object' && 'digest' in e) throw e;
-    redirect("/login");
+    redirect("/login?error=true");
   }
 }

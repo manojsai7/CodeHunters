@@ -3,6 +3,20 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const CANONICAL_HOST = "codehunters.dev";
 
+/**
+ * Copy any cookies set by Supabase (e.g. refreshed tokens) onto the redirect
+ * response so the browser always receives up-to-date auth cookies even when
+ * we short-circuit with a redirect instead of returning the next() response.
+ * Without this, a refreshed access-token is silently dropped and the old
+ * (consumed) refresh-token stays in the browser → infinite redirect loop.
+ */
+function withSessionCookies(redirect: NextResponse, session: NextResponse): NextResponse {
+  session.cookies.getAll().forEach((cookie) => {
+    redirect.cookies.set(cookie.name, cookie.value, cookie);
+  });
+  return redirect;
+}
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({
     request: { headers: request.headers },
@@ -60,7 +74,7 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirect", request.nextUrl.pathname);
-    return NextResponse.redirect(url);
+    return withSessionCookies(NextResponse.redirect(url), response);
   }
 
   // Protect admin routes
@@ -68,7 +82,7 @@ export async function updateSession(request: NextRequest) {
     if (!user) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
-      return NextResponse.redirect(url);
+      return withSessionCookies(NextResponse.redirect(url), response);
     }
 
     // Check admin role via profile
@@ -81,19 +95,24 @@ export async function updateSession(request: NextRequest) {
     if (!profile || profile.role !== "admin") {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard/my-learning";
-      return NextResponse.redirect(url);
+      return withSessionCookies(NextResponse.redirect(url), response);
     }
   }
 
-  // Redirect authenticated users away from auth pages
+  // Redirect authenticated users away from auth pages.
+  // Skip if an ?error param is present — that signals a loop-breaking redirect
+  // from the dashboard (e.g. missing profile, DB error) and we must NOT send
+  // them back to the dashboard again or we create an infinite redirect loop.
+  const hasErrorParam = request.nextUrl.searchParams.has("error");
   if (
     user &&
+    !hasErrorParam &&
     (request.nextUrl.pathname === "/login" ||
       request.nextUrl.pathname === "/register")
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard/my-learning";
-    return NextResponse.redirect(url);
+    return withSessionCookies(NextResponse.redirect(url), response);
   }
 
   // Add security headers

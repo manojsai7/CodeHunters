@@ -25,7 +25,9 @@ export default async function DashboardLayout({
   });
 
   if (!profile) {
-    redirect("/login");
+    // Use ?error=true so the middleware does NOT auto-redirect this authenticated
+    // user back to the dashboard — that would create an infinite redirect loop.
+    redirect("/login?error=true");
   }
 
   return (
@@ -58,7 +60,10 @@ export default async function DashboardLayout({
     </div>
   );
   } catch (e: unknown) {
+    // Rethrow Next.js redirect/not-found errors (they carry a 'digest' property).
     if (e && typeof e === 'object' && 'digest' in e) throw e;
-    redirect("/login");
+    // For unexpected errors (e.g. DB unreachable), redirect with ?error=true so
+    // the middleware does NOT bounce the user back to the dashboard and loop.
+    redirect("/login?error=true");
   }
 }

@@ -95,6 +95,6 @@ export default async function CoursePlayerPage({
   );
   } catch (e: unknown) {
     if (e && typeof e === 'object' && 'digest' in e) throw e;
-    redirect("/login");
+    redirect("/login?error=true");
   }
 }

@@ -17,7 +17,7 @@ export default async function ProfilePage() {
   const profile = await prisma.profile.findUnique({
     where: { userId: user.id },
   });
-  if (!profile) redirect("/login");
+  if (!profile) redirect("/login?error=true");
 
   return (
     <div className="space-y-6">
@@ -45,6 +45,6 @@ export default async function ProfilePage() {
   );
   } catch (e: unknown) {
     if (e && typeof e === 'object' && 'digest' in e) throw e;
-    redirect("/login");
+    redirect("/login?error=true");
   }
 }
