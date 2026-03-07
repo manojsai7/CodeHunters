@@ -17,7 +17,8 @@ export default async function ProfilePage() {
   const profile = await prisma.profile.findUnique({
     where: { userId: user.id },
   });
-  if (!profile) redirect("/login?error=true");
+  // Profile guaranteed by layout auto-create; redirect to overview if still missing.
+  if (!profile) redirect("/dashboard/my-learning");
 
   return (
     <div className="space-y-6">

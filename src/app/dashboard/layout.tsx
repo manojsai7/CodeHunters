@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/server";
 import prisma from "@/lib/prisma";
+import { createReferralCode } from "@/lib/referral";
 import { Navbar } from "@/components/layout/navbar";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 
@@ -20,14 +21,27 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  const profile = await prisma.profile.findUnique({
+  let profile = await prisma.profile.findUnique({
     where: { userId: user.id },
   });
 
   if (!profile) {
-    // Use ?error=true so the middleware does NOT auto-redirect this authenticated
-    // user back to the dashboard — that would create an infinite redirect loop.
-    redirect("/login?error=true");
+    // Profile missing — create it now so the user isn't stuck in a redirect loop.
+    // This handles the case where the auth callback ran before the DB was ready.
+    const referralCode = await createReferralCode();
+    const name =
+      user.user_metadata?.full_name ||
+      user.user_metadata?.name ||
+      user.email?.split("@")[0] ||
+      "User";
+    profile = await prisma.profile.create({
+      data: {
+        userId: user.id,
+        email: user.email ?? "",
+        name,
+        referralCode,
+      },
+    });
   }
 
   return (

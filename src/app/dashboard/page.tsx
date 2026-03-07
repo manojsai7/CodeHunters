@@ -30,7 +30,9 @@ export default async function DashboardPage() {
   const profile = await prisma.profile.findUnique({
     where: { userId: user.id },
   });
-  if (!profile) redirect("/login?error=true");
+  // Profile is guaranteed by dashboard/layout.tsx (which auto-creates it).
+  // If somehow still null here, bail gracefully.
+  if (!profile) redirect("/dashboard/my-learning");
 
   // Fetch counts and data in parallel
   const [coursePurchases, projectPurchases, lessonProgress, recentPurchases] =
