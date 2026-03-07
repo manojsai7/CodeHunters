@@ -59,14 +59,23 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Update purchase to completed
-      await prisma.purchase.update({
-        where: { id: purchase.id },
+      // Atomic check-and-set: only update if still pending (prevents double-completion)
+      const { count: updated } = await prisma.purchase.updateMany({
+        where: { id: purchase.id, status: "pending" },
         data: {
           status: "completed",
           razorpayPaymentId: razorpay_payment_id,
         },
       });
+
+      // If another request already completed this purchase, exit early
+      if (updated === 0) {
+        return NextResponse.json({
+          success: true,
+          purchaseId: purchase.id,
+          message: "Payment already verified",
+        });
+      }
 
       // Increment purchasesCount on course or project
       if (purchase.courseId) {
@@ -185,13 +194,22 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      await prisma.guestPurchase.update({
-        where: { id: guestPurchase.id },
+      // Atomic check-and-set: only update if still pending
+      const { count: guestUpdated } = await prisma.guestPurchase.updateMany({
+        where: { id: guestPurchase.id, status: "pending" },
         data: {
           status: "completed",
           razorpayPaymentId: razorpay_payment_id,
         },
       });
+
+      if (guestUpdated === 0) {
+        return NextResponse.json({
+          success: true,
+          purchaseId: guestPurchase.id,
+          message: "Payment already verified",
+        });
+      }
 
       // Increment purchasesCount
       if (guestPurchase.productType === "course") {

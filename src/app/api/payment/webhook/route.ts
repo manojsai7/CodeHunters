@@ -11,10 +11,6 @@ import {
 import { generateInvoiceNumber } from "@/lib/invoice";
 import { calculateGST } from "@/lib/gst";
 
-// In-memory set for webhook event deduplication (survives within warm instance)
-const processedEvents = new Set<string>();
-const MAX_PROCESSED_EVENTS = 10000;
-
 export async function POST(request: NextRequest) {
   try {
     const rawBody = await request.text();
@@ -39,22 +35,6 @@ export async function POST(request: NextRequest) {
     const eventType = event.event as string;
     const payload = event.payload;
 
-    // Idempotency: deduplicate by Razorpay event ID
-    const eventId = event.account_id && event.payload?.payment?.entity?.id
-      ? `${eventType}:${event.payload.payment.entity.id}`
-      : `${eventType}:${JSON.stringify(event).substring(0, 64)}`;
-
-    if (processedEvents.has(eventId)) {
-      return NextResponse.json({ ok: true, message: "Duplicate event ignored" });
-    }
-
-    // Evict oldest entries if set grows too large
-    if (processedEvents.size >= MAX_PROCESSED_EVENTS) {
-      const first = processedEvents.values().next().value;
-      if (first) processedEvents.delete(first);
-    }
-    processedEvents.add(eventId);
-
     switch (eventType) {
       case "payment.captured": {
         const payment = payload.payment.entity;
@@ -67,14 +47,16 @@ export async function POST(request: NextRequest) {
         });
 
         if (purchase && purchase.status !== "completed") {
-          await prisma.purchase.update({
-            where: { id: purchase.id },
+          // Atomic check-and-set: only complete if still pending (prevents double-completion race with verify route)
+          const { count: updated } = await prisma.purchase.updateMany({
+            where: { id: purchase.id, status: "pending" },
             data: {
               status: "completed",
               razorpayPaymentId: payment.id,
             },
           });
 
+         if (updated > 0) {
           // Increment purchasesCount
           if (purchase.courseId) {
             await prisma.course.update({
@@ -166,6 +148,7 @@ export async function POST(request: NextRequest) {
               );
             }
           }
+         } // end if (updated > 0)
         }
 
         // Also check guest purchases
@@ -174,14 +157,16 @@ export async function POST(request: NextRequest) {
         });
 
         if (guestPurchase && guestPurchase.status !== "completed") {
-          await prisma.guestPurchase.update({
-            where: { id: guestPurchase.id },
+          // Atomic check-and-set for guest purchases
+          const { count: guestUpdated } = await prisma.guestPurchase.updateMany({
+            where: { id: guestPurchase.id, status: "pending" },
             data: {
               status: "completed",
               razorpayPaymentId: payment.id,
             },
           });
 
+         if (guestUpdated > 0) {
           if (guestPurchase.productType === "course") {
             await prisma.course.update({
               where: { id: guestPurchase.productId },
@@ -259,8 +244,7 @@ export async function POST(request: NextRequest) {
             }).catch((err) =>
               console.error("Discord webhook failed:", err)
             );
-          }
-        }
+          }         } // end if (guestUpdated > 0)        }
 
         break;
       }

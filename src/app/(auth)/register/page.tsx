@@ -17,7 +17,7 @@ export default async function RegisterPage({ searchParams: searchParamsPromise }
   try {
     const user = await getUser();
     if (user) {
-      redirect("/dashboard");
+      redirect("/dashboard/my-learning");
     }
   } catch (e: unknown) {
     if (e && typeof e === 'object' && 'digest' in e) throw e;

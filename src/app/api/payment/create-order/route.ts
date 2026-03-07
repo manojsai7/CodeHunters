@@ -92,7 +92,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Coupon discount
-    let validCoupon: { id: string; discount: number; code: string } | null = null;
+    let validCoupon: { id: string; discount: number; code: string; type: string } | null = null;
+    let flatDiscountAmount = 0;
     if (couponCode) {
       const coupon = await prisma.coupon.findUnique({
         where: { code: couponCode },
@@ -105,15 +106,20 @@ export async function POST(request: NextRequest) {
         new Date() < coupon.expiresAt
       ) {
         validCoupon = coupon;
-        totalDiscountPercent += coupon.discount;
+        if (coupon.type === "flat") {
+          flatDiscountAmount = coupon.discount;
+        } else {
+          totalDiscountPercent += coupon.discount;
+        }
       }
     }
 
-    // Cap total discount
+    // Cap total percent discount
     totalDiscountPercent = Math.min(totalDiscountPercent, MAX_TOTAL_DISCOUNT_PERCENT);
 
-    const discountAmount = Math.round(originalAmount * (totalDiscountPercent / 100));
-    const finalAmount = originalAmount - discountAmount;
+    const percentDiscountAmount = Math.round(originalAmount * (totalDiscountPercent / 100));
+    const discountAmount = Math.min(percentDiscountAmount + flatDiscountAmount, originalAmount);
+    const finalAmount = Math.max(originalAmount - discountAmount, 0);
     const amountInPaise = Math.round(finalAmount * 100);
 
     // Get authenticated user if available
