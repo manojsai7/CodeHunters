@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUser } from "@/lib/supabase/server";
-import prisma from "@/lib/prisma";
+import { getUser, createAdminSupabaseClient } from "@/lib/supabase/server";
 import { safeJsonParse } from "@/lib/utils";
 
 export async function POST(request: NextRequest) {
@@ -23,14 +22,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const db = createAdminSupabaseClient();
+
     // Verify user has purchased the course
-    const purchase = await prisma.purchase.findFirst({
-      where: {
-        userId: user.id,
-        courseId,
-        status: "completed",
-      },
-    });
+    const { data: purchase } = await db
+      .from("purchases")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("course_id", courseId)
+      .eq("status", "completed")
+      .maybeSingle();
 
     if (!purchase) {
       return NextResponse.json(
@@ -40,9 +41,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the lesson belongs to the course
-    const lesson = await prisma.lesson.findFirst({
-      where: { id: lessonId, courseId },
-    });
+    const { data: lesson } = await db
+      .from("lessons")
+      .select("id")
+      .eq("id", lessonId)
+      .eq("course_id", courseId)
+      .maybeSingle();
 
     if (!lesson) {
       return NextResponse.json(
@@ -52,22 +56,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Upsert lesson progress
-    const progress = await prisma.lessonProgress.upsert({
-      where: {
-        userId_lessonId: {
-          userId: user.id,
-          lessonId,
+    const { data: progress, error: upsertError } = await db
+      .from("lesson_progress")
+      .upsert(
+        {
+          user_id: user.id,
+          lesson_id: lessonId,
+          completed: isCompleted ?? true,
         },
-      },
-      create: {
-        userId: user.id,
-        lessonId,
-        completed: isCompleted ?? true,
-      },
-      update: {
-        completed: isCompleted ?? true,
-      },
-    });
+        { onConflict: "user_id,lesson_id" }
+      )
+      .select()
+      .single();
+
+    if (upsertError) throw upsertError;
 
     return NextResponse.json({ success: true, progress });
   } catch (error) {

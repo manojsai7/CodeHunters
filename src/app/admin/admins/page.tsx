@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { getUser } from "@/lib/supabase/server";
-import prisma from "@/lib/prisma";
+import { getUser, createAdminSupabaseClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,14 +14,20 @@ export default async function ManageAdminsPage() {
   const user = await getUser();
   if (!user) redirect("/login");
 
-  const me = await prisma.profile.findUnique({ where: { userId: user.id } });
+  const db = createAdminSupabaseClient();
+
+  const { data: me } = await db
+    .from("profiles")
+    .select("role")
+    .eq("user_id", user.id)
+    .maybeSingle();
   if (me?.role !== "owner") redirect("/admin?error=owner_only");
 
-  const admins = await prisma.profile.findMany({
-    where: { role: { in: ["admin", "owner"] } },
-    orderBy: { createdAt: "asc" },
-    select: { userId: true, name: true, email: true, role: true, createdAt: true },
-  });
+  const { data: admins } = await db
+    .from("profiles")
+    .select("user_id, name, email, role, created_at")
+    .in("role", ["admin", "owner"])
+    .order("created_at", { ascending: true });
 
   return (
     <div className="space-y-8">
@@ -68,7 +73,7 @@ export default async function ManageAdminsPage() {
       {/* Current admins table */}
       <Card>
         <CardHeader>
-          <CardTitle>Current Admins &amp; Owners ({admins.length})</CardTitle>
+          <CardTitle>Current Admins &amp; Owners ({(admins ?? []).length})</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -83,8 +88,8 @@ export default async function ManageAdminsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {admins.map((a) => (
-                  <tr key={a.userId} className="hover:bg-surface-hover">
+                {(admins ?? []).map((a) => (
+                  <tr key={a.user_id} className="hover:bg-surface-hover">
                     <td className="px-6 py-4 font-medium text-white">{a.name}</td>
                     <td className="px-6 py-4 text-muted">{a.email}</td>
                     <td className="px-6 py-4">
@@ -92,10 +97,10 @@ export default async function ManageAdminsPage() {
                         {a.role}
                       </Badge>
                     </td>
-                    <td className="px-6 py-4 text-muted">{formatDate(a.createdAt)}</td>
+                    <td className="px-6 py-4 text-muted">{formatDate(a.created_at)}</td>
                   </tr>
                 ))}
-                {admins.length === 0 && (
+                {(admins ?? []).length === 0 && (
                   <tr>
                     <td colSpan={4} className="px-6 py-12 text-center text-muted">
                       No admins found.

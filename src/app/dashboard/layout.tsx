@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { getUser } from "@/lib/supabase/server";
-import prisma from "@/lib/prisma";
+import { createServerSupabaseClient, getUser } from "@/lib/supabase/server";
 import { createReferralCode } from "@/lib/referral";
 import { Navbar } from "@/components/layout/navbar";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
@@ -26,7 +25,12 @@ export default async function DashboardLayout({
   } | null = null;
 
   try {
-    let dbProfile = await prisma.profile.findUnique({ where: { userId: user.id } });
+    const supabase = await createServerSupabaseClient();
+    const { data: dbProfile } = await supabase
+      .from("profiles")
+      .select("email, name, role, gold_coins, avatar_url, referral_code")
+      .eq("user_id", user.id)
+      .single();
 
     if (!dbProfile) {
       const referralCode = await createReferralCode();
@@ -35,21 +39,23 @@ export default async function DashboardLayout({
         user.user_metadata?.name ||
         user.email?.split("@")[0] ||
         "User";
-      dbProfile = await prisma.profile.create({
-        data: { userId: user.id, email: user.email ?? "", name, referralCode },
+      await supabase.from("profiles").insert({
+        user_id: user.id,
+        email: user.email ?? "",
+        name,
+        referral_code: referralCode,
       });
+      profile = { email: user.email ?? "", name, role: "student", goldCoins: 0, avatarUrl: null };
+    } else {
+      profile = {
+        email: dbProfile.email,
+        name: dbProfile.name,
+        role: dbProfile.role,
+        goldCoins: dbProfile.gold_coins,
+        avatarUrl: dbProfile.avatar_url,
+      };
     }
-
-    profile = {
-      email: dbProfile.email,
-      name: dbProfile.name,
-      role: dbProfile.role,
-      goldCoins: dbProfile.goldCoins,
-      avatarUrl: dbProfile.avatarUrl,
-    };
   } catch (dbErr) {
-    // DB unreachable (e.g. DATABASE_URL not set) — fall back to auth metadata
-    // so the user can at least see the dashboard shell while we diagnose.
     console.error("[dashboard/layout] DB unavailable, using auth metadata:", dbErr);
     profile = {
       email: user.email ?? "",

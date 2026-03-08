@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { getUser } from "@/lib/supabase/server";
+import { getUser, createAdminSupabaseClient } from "@/lib/supabase/server";
 import { z } from "zod";
 import { safeJsonParse } from "@/lib/utils";
 
@@ -34,11 +33,14 @@ export async function POST(request: NextRequest) {
     }
 
     const { courseId, rating, comment } = parsed.data;
+    const db = createAdminSupabaseClient();
 
     // Check course exists
-    const course = await prisma.course.findUnique({
-      where: { id: courseId },
-    });
+    const { data: course } = await db
+      .from("courses")
+      .select("id")
+      .eq("id", courseId)
+      .maybeSingle();
 
     if (!course) {
       return NextResponse.json(
@@ -48,13 +50,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Check user has purchased the course
-    const purchase = await prisma.purchase.findFirst({
-      where: {
-        userId: user.id,
-        courseId,
-        status: "completed",
-      },
-    });
+    const { data: purchase } = await db
+      .from("purchases")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("course_id", courseId)
+      .eq("status", "completed")
+      .maybeSingle();
 
     if (!purchase) {
       return NextResponse.json(
@@ -64,14 +66,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already reviewed
-    const existingReview = await prisma.review.findUnique({
-      where: {
-        userId_courseId: {
-          userId: user.id,
-          courseId,
-        },
-      },
-    });
+    const { data: existingReview } = await db
+      .from("reviews")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("course_id", courseId)
+      .maybeSingle();
 
     if (existingReview) {
       return NextResponse.json(
@@ -81,35 +81,45 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user profile for name
-    const profile = await prisma.profile.findUnique({
-      where: { userId: user.id },
-    });
+    const { data: profile } = await db
+      .from("profiles")
+      .select("name")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
     // Create review
-    const review = await prisma.review.create({
-      data: {
-        userId: user.id,
-        courseId,
+    const { data: review, error: reviewError } = await db
+      .from("reviews")
+      .insert({
+        user_id: user.id,
+        course_id: courseId,
         rating,
         comment,
-        userName: profile?.name ?? "Anonymous",
-      },
-    });
+        user_name: profile?.name ?? "Anonymous",
+      })
+      .select()
+      .single();
+
+    if (reviewError) throw reviewError;
 
     // Recompute course average rating and review count
-    const aggregation = await prisma.review.aggregate({
-      where: { courseId },
-      _avg: { rating: true },
-      _count: { rating: true },
-    });
+    const { data: allReviews } = await db
+      .from("reviews")
+      .select("rating")
+      .eq("course_id", courseId);
 
-    await prisma.course.update({
-      where: { id: courseId },
-      data: {
-        rating: Math.round((aggregation._avg.rating ?? 0) * 10) / 10,
-        reviewCount: aggregation._count.rating,
-      },
-    });
+    const reviewCount = allReviews?.length ?? 0;
+    const avgRating =
+      reviewCount > 0
+        ? Math.round(
+            ((allReviews!.reduce((sum, r) => sum + r.rating, 0) / reviewCount) * 10)
+          ) / 10
+        : 0;
+
+    await db
+      .from("courses")
+      .update({ rating: avgRating, review_count: reviewCount })
+      .eq("id", courseId);
 
     return NextResponse.json(review, { status: 201 });
   } catch (error) {
@@ -133,13 +143,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const reviews = await prisma.review.findMany({
-      where: { courseId },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    });
+    const db = createAdminSupabaseClient();
 
-    return NextResponse.json(reviews);
+    const { data: reviews } = await db
+      .from("reviews")
+      .select("*")
+      .eq("course_id", courseId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    return NextResponse.json(reviews ?? []);
   } catch (error) {
     console.error("Fetch reviews error:", error);
     return NextResponse.json(

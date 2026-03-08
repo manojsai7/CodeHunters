@@ -1,5 +1,5 @@
 import Link from "next/link";
-import prisma from "@/lib/prisma";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { CoursesTable } from "./courses-table";
@@ -12,14 +12,15 @@ export const metadata = {
 
 export default async function AdminCoursesPage() {
   try {
-  const courses = await prisma.course.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      _count: { select: { purchases: true, lessons: true, reviews: true } },
-    },
-  });
+  const db = createAdminSupabaseClient();
 
-  const data = courses.map((c) => ({
+  const { data: courses } = await db
+    .from("courses")
+    .select("*, purchases(id), lessons(id), reviews(id)")
+    .order("created_at", { ascending: false });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = (courses ?? []).map((c: any) => ({
     id: c.id,
     slug: c.slug,
     title: c.title,
@@ -28,12 +29,12 @@ export default async function AdminCoursesPage() {
     difficulty: c.difficulty,
     price: c.price,
     mrp: c.mrp,
-    isPublished: c.isPublished,
-    isBestseller: c.isBestseller,
-    purchasesCount: c._count.purchases,
-    lessonsCount: c._count.lessons,
-    reviewCount: c._count.reviews,
-    createdAt: c.createdAt.toISOString(),
+    isPublished: c.is_published,
+    isBestseller: c.is_bestseller,
+    purchasesCount: Array.isArray(c.purchases) ? c.purchases.length : 0,
+    lessonsCount: Array.isArray(c.lessons) ? c.lessons.length : 0,
+    reviewCount: Array.isArray(c.reviews) ? c.reviews.length : 0,
+    createdAt: c.created_at,
   }));
 
   return (
@@ -42,7 +43,7 @@ export default async function AdminCoursesPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Courses</h1>
           <p className="text-sm text-muted mt-1">
-            {courses.length} total courses
+            {data.length} total courses
           </p>
         </div>
         <Link href="/admin/courses/new">

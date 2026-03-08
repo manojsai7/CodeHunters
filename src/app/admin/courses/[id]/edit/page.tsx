@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import prisma from "@/lib/prisma";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { CourseForm } from "@/components/admin/course-form";
 
 export const metadata = {
@@ -13,21 +13,23 @@ export default async function EditCoursePage({
 }) {
   const params = await paramsPromise;
   try {
-  const course = await prisma.course.findUnique({
-    where: { id: params.id },
-    include: { lessons: { orderBy: { order: "asc" } } },
-  });
+  const db = createAdminSupabaseClient();
+
+  const { data: course } = await db
+    .from("courses")
+    .select("*, lessons(*)") 
+    .eq("id", params.id)
+    .single();
 
   if (!course) notFound();
 
+  // Sort lessons by order
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lessons = Array.isArray(course.lessons) ? (course.lessons as any[]).sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0)) : [];
+
   const courseData = {
     ...course,
-    createdAt: course.createdAt.toISOString(),
-    updatedAt: course.updatedAt.toISOString(),
-    lessons: course.lessons.map((l) => ({
-      ...l,
-      createdAt: l.createdAt.toISOString(),
-    })),
+    lessons,
   };
 
   return (

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
-import prisma from "@/lib/prisma";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { verifyWebhookSignature } from "@/lib/razorpay";
 import { creditReferralCoins } from "@/lib/referral";
 import {
@@ -34,6 +33,7 @@ export async function POST(request: NextRequest) {
     const event = JSON.parse(rawBody);
     const eventType = event.event as string;
     const payload = event.payload;
+    const db = createAdminSupabaseClient();
 
     switch (eventType) {
       case "payment.captured": {
@@ -41,59 +41,58 @@ export async function POST(request: NextRequest) {
         const orderId = payment.order_id as string;
 
         // Handle in Purchase table
-        const purchase = await prisma.purchase.findUnique({
-          where: { razorpayOrderId: orderId },
-          include: { profile: true, course: true, project: true },
-        });
+        const { data: purchase } = await db
+          .from("purchases")
+          .select("*, profiles(*), courses(*), projects(*)")
+          .eq("razorpay_order_id", orderId)
+          .maybeSingle();
 
         if (purchase && purchase.status !== "completed") {
-          // Atomic check-and-set: only complete if still pending (prevents double-completion race with verify route)
-          const { count: updated } = await prisma.purchase.updateMany({
-            where: { id: purchase.id, status: "pending" },
-            data: {
+          // Atomic check-and-set: only complete if still pending
+          const { count: updated } = await db
+            .from("purchases")
+            .update({
               status: "completed",
-              razorpayPaymentId: payment.id,
-            },
-          });
+              razorpay_payment_id: payment.id,
+            })
+            .eq("id", purchase.id)
+            .eq("status", "pending");
 
-         if (updated > 0) {
+         if ((updated ?? 0) > 0) {
           // Increment purchasesCount
-          if (purchase.courseId) {
-            await prisma.course.update({
-              where: { id: purchase.courseId },
-              data: { purchasesCount: { increment: 1 } },
-            });
-          } else if (purchase.projectId) {
-            await prisma.project.update({
-              where: { id: purchase.projectId },
-              data: { purchasesCount: { increment: 1 } },
-            });
+          if (purchase.course_id) {
+            const { data: c } = await db.from("courses").select("purchases_count").eq("id", purchase.course_id).single();
+            if (c) await db.from("courses").update({ purchases_count: (c.purchases_count ?? 0) + 1 }).eq("id", purchase.course_id);
+          } else if (purchase.project_id) {
+            const { data: p } = await db.from("projects").select("purchases_count").eq("id", purchase.project_id).single();
+            if (p) await db.from("projects").update({ purchases_count: (p.purchases_count ?? 0) + 1 }).eq("id", purchase.project_id);
           }
 
           // Credit referral coins
-          if (purchase.userId) {
-            await creditReferralCoins(purchase.userId);
+          if (purchase.user_id) {
+            await creditReferralCoins(purchase.user_id);
           }
 
           // Increment coupon usage
-          if (purchase.couponCode) {
-            await prisma.coupon.update({
-              where: { code: purchase.couponCode },
-              data: { usedCount: { increment: 1 } },
-            });
+          if (purchase.coupon_code) {
+            const { data: coupon } = await db.from("coupons").select("used_count").eq("code", purchase.coupon_code).single();
+            if (coupon) {
+              await db.from("coupons").update({ used_count: (coupon.used_count ?? 0) + 1 }).eq("code", purchase.coupon_code);
+            }
           }
 
           // Send purchase confirmation + invoice email via Resend
-          if (purchase.profile?.email) {
+          const profileData = purchase.profiles;
+          if (profileData?.email) {
             const productTitle =
-              purchase.course?.title ?? purchase.project?.title ?? "Unknown";
-            const productType = purchase.courseId ? "course" : "project";
-            const buyerState = purchase.profile.state || "Unknown";
+              purchase.courses?.title ?? purchase.projects?.title ?? "Unknown";
+            const productType = purchase.course_id ? "course" : "project";
+            const buyerState = profileData.state || "Unknown";
             const amountInRupees = purchase.amount / 100;
 
             sendPurchaseConfirmationEmail(
-              purchase.profile.email,
-              purchase.profile.name || "Hunter",
+              profileData.email,
+              profileData.name || "Hunter",
               productTitle,
               purchase.amount,
               payment.id
@@ -108,28 +107,28 @@ export async function POST(request: NextRequest) {
               year: "numeric",
             });
 
-            await prisma.purchase.update({
-              where: { id: purchase.id },
-              data: {
-                invoiceNumber,
-                invoiceDate: new Date(),
-                gstData: gstData as unknown as Prisma.InputJsonValue,
-              },
-            });
+            await db
+              .from("purchases")
+              .update({
+                invoice_number: invoiceNumber,
+                invoice_date: new Date().toISOString(),
+                gst_data: gstData,
+              })
+              .eq("id", purchase.id);
 
             sendPurchaseInvoiceEmail(
-              purchase.profile.email,
-              purchase.profile.name || "Hunter",
+              profileData.email,
+              profileData.name || "Hunter",
               {
                 invoiceNumber,
                 invoiceDate,
-                buyerName: purchase.profile.name || "Hunter",
-                buyerEmail: purchase.profile.email,
+                buyerName: profileData.name || "Hunter",
+                buyerEmail: profileData.email,
                 buyerState,
                 productTitle,
                 productType: productType as "course" | "project",
-                originalAmount: purchase.originalAmount / 100,
-                discountAmount: purchase.discountApplied,
+                originalAmount: purchase.original_amount / 100,
+                discountAmount: purchase.discount_applied,
                 ...gstData,
                 razorpayPaymentId: payment.id,
               }
@@ -141,7 +140,7 @@ export async function POST(request: NextRequest) {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  content: `💰 New sale! **${purchase.profile.name}** bought **${productTitle}** for ₹${amountInRupees} | Invoice: ${invoiceNumber}`,
+                  content: `💰 New sale! **${profileData.name}** bought **${productTitle}** for ₹${amountInRupees} | Invoice: ${invoiceNumber}`,
                 }),
               }).catch((err) =>
                 console.error("Discord webhook failed:", err)
@@ -152,42 +151,36 @@ export async function POST(request: NextRequest) {
         }
 
         // Also check guest purchases
-        const guestPurchase = await prisma.guestPurchase.findUnique({
-          where: { razorpayOrderId: orderId },
-        });
+        const { data: guestPurchase } = await db
+          .from("guest_purchases")
+          .select("*")
+          .eq("razorpay_order_id", orderId)
+          .maybeSingle();
 
         if (guestPurchase && guestPurchase.status !== "completed") {
           // Atomic check-and-set for guest purchases
-          const { count: guestUpdated } = await prisma.guestPurchase.updateMany({
-            where: { id: guestPurchase.id, status: "pending" },
-            data: {
+          const { count: guestUpdated } = await db
+            .from("guest_purchases")
+            .update({
               status: "completed",
-              razorpayPaymentId: payment.id,
-            },
-          });
+              razorpay_payment_id: payment.id,
+            })
+            .eq("id", guestPurchase.id)
+            .eq("status", "pending");
 
-         if (guestUpdated > 0) {
-          if (guestPurchase.productType === "course") {
-            await prisma.course.update({
-              where: { id: guestPurchase.productId },
-              data: { purchasesCount: { increment: 1 } },
-            });
-          } else {
-            await prisma.project.update({
-              where: { id: guestPurchase.productId },
-              data: { purchasesCount: { increment: 1 } },
-            });
+         if ((guestUpdated ?? 0) > 0) {
+          const countTable = guestPurchase.product_type === "course" ? "courses" : "projects";
+          const { data: prod } = await db.from(countTable).select("purchases_count").eq("id", guestPurchase.product_id).single();
+          if (prod) {
+            await db.from(countTable).update({ purchases_count: (prod.purchases_count ?? 0) + 1 }).eq("id", guestPurchase.product_id);
           }
 
           // Send purchase confirmation + invoice email to guest
-          let guestProductTitle = guestPurchase.productType === "course" ? "Course" : "Project";
-          if (guestPurchase.productType === "course") {
-            const course = await prisma.course.findUnique({ where: { id: guestPurchase.productId }, select: { title: true } });
-            if (course) guestProductTitle = course.title;
-          } else {
-            const project = await prisma.project.findUnique({ where: { id: guestPurchase.productId }, select: { title: true } });
-            if (project) guestProductTitle = project.title;
-          }
+          let guestProductTitle = guestPurchase.product_type === "course" ? "Course" : "Project";
+          const prodTable = guestPurchase.product_type === "course" ? "courses" : "projects";
+          const { data: prodData } = await db.from(prodTable).select("title").eq("id", guestPurchase.product_id).single();
+          if (prodData) guestProductTitle = prodData.title;
+
           sendPurchaseConfirmationEmail(
             guestPurchase.email,
             guestPurchase.name,
@@ -206,14 +199,14 @@ export async function POST(request: NextRequest) {
             year: "numeric",
           });
 
-          await prisma.guestPurchase.update({
-            where: { id: guestPurchase.id },
-            data: {
-              invoiceNumber: guestInvoiceNumber,
-              invoiceDate: new Date(),
-              gstData: guestGstData as unknown as Prisma.InputJsonValue,
-            },
-          });
+          await db
+            .from("guest_purchases")
+            .update({
+              invoice_number: guestInvoiceNumber,
+              invoice_date: new Date().toISOString(),
+              gst_data: guestGstData,
+            })
+            .eq("id", guestPurchase.id);
 
           sendPurchaseInvoiceEmail(
             guestPurchase.email,
@@ -225,9 +218,9 @@ export async function POST(request: NextRequest) {
               buyerEmail: guestPurchase.email,
               buyerState: guestPurchase.state,
               productTitle: guestProductTitle,
-              productType: guestPurchase.productType as "course" | "project",
+              productType: guestPurchase.product_type as "course" | "project",
               originalAmount: guestAmountInRupees,
-              discountAmount: guestPurchase.discountApplied,
+              discountAmount: guestPurchase.discount_applied,
               ...guestGstData,
               razorpayPaymentId: payment.id,
             }
@@ -244,7 +237,8 @@ export async function POST(request: NextRequest) {
             }).catch((err) =>
               console.error("Discord webhook failed:", err)
             );
-          }         } // end if (guestUpdated > 0)
+          }
+         } // end if (guestUpdated > 0)
         } // end if (guestPurchase && status !== "completed")
 
         break;
@@ -258,48 +252,49 @@ export async function POST(request: NextRequest) {
           payment.error_reason ||
           "Payment was declined by your bank";
 
-        await prisma.purchase.updateMany({
-          where: { razorpayOrderId: orderId, status: "pending" },
-          data: { status: "failed" },
-        });
+        await db
+          .from("purchases")
+          .update({ status: "failed" })
+          .eq("razorpay_order_id", orderId)
+          .eq("status", "pending");
 
-        await prisma.guestPurchase.updateMany({
-          where: { razorpayOrderId: orderId, status: "pending" },
-          data: { status: "failed" },
-        });
+        await db
+          .from("guest_purchases")
+          .update({ status: "failed" })
+          .eq("razorpay_order_id", orderId)
+          .eq("status", "pending");
 
         // Look up the failed purchase to send email + log attempt
-        const failedPurchase = await prisma.purchase.findUnique({
-          where: { razorpayOrderId: orderId },
-          include: { profile: true, course: true, project: true },
-        });
+        const { data: failedPurchase } = await db
+          .from("purchases")
+          .select("*, profiles(*), courses(*), projects(*)")
+          .eq("razorpay_order_id", orderId)
+          .maybeSingle();
 
         if (failedPurchase) {
           const productTitle =
-            failedPurchase.course?.title ??
-            failedPurchase.project?.title ??
+            failedPurchase.courses?.title ??
+            failedPurchase.projects?.title ??
             "Unknown";
-          const productType = failedPurchase.courseId ? "course" : "project";
+          const productType = failedPurchase.course_id ? "course" : "project";
           const productSlug =
-            failedPurchase.course?.slug ?? failedPurchase.project?.slug;
+            failedPurchase.courses?.slug ?? failedPurchase.projects?.slug;
 
-          await prisma.paymentAttempt.create({
-            data: {
-              guestEmail: failedPurchase.profile?.email || "",
-              guestName: failedPurchase.profile?.name || "Unknown",
-              productId: failedPurchase.courseId || failedPurchase.projectId || "",
-              productType,
-              amount: failedPurchase.amount,
-              razorpayOrderId: orderId,
-              failureReason,
-            },
+          await db.from("payment_attempts").insert({
+            guest_email: failedPurchase.profiles?.email || "",
+            guest_name: failedPurchase.profiles?.name || "Unknown",
+            product_id: failedPurchase.course_id || failedPurchase.project_id || "",
+            product_type: productType,
+            amount: failedPurchase.amount,
+            razorpay_order_id: orderId,
+            failure_reason: failureReason,
           });
 
-          if (failedPurchase.profile?.email && productSlug) {
+          if (failedPurchase.profiles?.email && productSlug) {
             const retryUrl = `${process.env.NEXT_PUBLIC_APP_URL}/${productType === "course" ? "courses" : "projects"}/${productSlug}`;
             sendPaymentFailedEmail(
-              failedPurchase.profile.email,
-              failedPurchase.profile.name || "Hunter",
+              failedPurchase.profiles.email,
+              failedPurchase.profiles.name || "Hunter",
               productTitle,
               failedPurchase.amount / 100,
               failureReason,
@@ -309,47 +304,34 @@ export async function POST(request: NextRequest) {
         }
 
         // Check guest failed
-        const failedGuest = await prisma.guestPurchase.findUnique({
-          where: { razorpayOrderId: orderId },
-        });
+        const { data: failedGuest } = await db
+          .from("guest_purchases")
+          .select("*")
+          .eq("razorpay_order_id", orderId)
+          .maybeSingle();
 
         if (failedGuest) {
-          let guestFailedProductTitle = failedGuest.productType === "course" ? "Course" : "Project";
+          let guestFailedProductTitle = failedGuest.product_type === "course" ? "Course" : "Project";
           let guestFailedSlug = "";
-          if (failedGuest.productType === "course") {
-            const course = await prisma.course.findUnique({
-              where: { id: failedGuest.productId },
-              select: { title: true, slug: true },
-            });
-            if (course) {
-              guestFailedProductTitle = course.title;
-              guestFailedSlug = course.slug;
-            }
-          } else {
-            const project = await prisma.project.findUnique({
-              where: { id: failedGuest.productId },
-              select: { title: true, slug: true },
-            });
-            if (project) {
-              guestFailedProductTitle = project.title;
-              guestFailedSlug = project.slug;
-            }
+          const failedProdTable = failedGuest.product_type === "course" ? "courses" : "projects";
+          const { data: failedProd } = await db.from(failedProdTable).select("title, slug").eq("id", failedGuest.product_id).single();
+          if (failedProd) {
+            guestFailedProductTitle = failedProd.title;
+            guestFailedSlug = failedProd.slug;
           }
 
-          await prisma.paymentAttempt.create({
-            data: {
-              guestEmail: failedGuest.email,
-              guestName: failedGuest.name,
-              productId: failedGuest.productId,
-              productType: failedGuest.productType,
-              amount: failedGuest.amount,
-              razorpayOrderId: orderId,
-              failureReason,
-            },
+          await db.from("payment_attempts").insert({
+            guest_email: failedGuest.email,
+            guest_name: failedGuest.name,
+            product_id: failedGuest.product_id,
+            product_type: failedGuest.product_type,
+            amount: failedGuest.amount,
+            razorpay_order_id: orderId,
+            failure_reason: failureReason,
           });
 
           if (guestFailedSlug) {
-            const retryUrl = `${process.env.NEXT_PUBLIC_APP_URL}/${failedGuest.productType === "course" ? "courses" : "projects"}/${guestFailedSlug}`;
+            const retryUrl = `${process.env.NEXT_PUBLIC_APP_URL}/${failedGuest.product_type === "course" ? "courses" : "projects"}/${guestFailedSlug}`;
             sendPaymentFailedEmail(
               failedGuest.email,
               failedGuest.name,
@@ -369,15 +351,15 @@ export async function POST(request: NextRequest) {
         const paymentId = refund?.payment_id as string;
 
         if (paymentId) {
-          await prisma.purchase.updateMany({
-            where: { razorpayPaymentId: paymentId },
-            data: { status: "refunded" },
-          });
+          await db
+            .from("purchases")
+            .update({ status: "refunded" })
+            .eq("razorpay_payment_id", paymentId);
 
-          await prisma.guestPurchase.updateMany({
-            where: { razorpayPaymentId: paymentId },
-            data: { status: "refunded" },
-          });
+          await db
+            .from("guest_purchases")
+            .update({ status: "refunded" })
+            .eq("razorpay_payment_id", paymentId);
         }
 
         break;

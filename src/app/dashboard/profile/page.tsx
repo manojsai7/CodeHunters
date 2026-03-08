@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { getUser } from "@/lib/supabase/server";
-import prisma from "@/lib/prisma";
+import { getUser, createServerSupabaseClient } from "@/lib/supabase/server";
 import { ProfileForm } from "@/components/dashboard/profile-form";
 
 export const dynamic = 'force-dynamic';
@@ -14,10 +13,12 @@ export default async function ProfilePage() {
   const user = await getUser();
   if (!user) redirect("/login");
 
-  const profile = await prisma.profile.findUnique({
-    where: { userId: user.id },
-  });
-  // Profile guaranteed by layout auto-create; redirect to overview if still missing.
+  const supabase = await createServerSupabaseClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("user_id", user.id)
+    .single();
   if (!profile) redirect("/dashboard/my-learning");
 
   return (
@@ -37,9 +38,9 @@ export default async function ProfilePage() {
           email: profile.email,
           phone: profile.phone || "",
           state: profile.state || "",
-          avatarUrl: profile.avatarUrl || "",
-          studentVerified: profile.studentVerified,
-          studentEmail: profile.studentEmail || "",
+          avatarUrl: profile.avatar_url || "",
+          studentVerified: profile.student_verified,
+          studentEmail: profile.student_email || "",
         }}
       />
     </div>

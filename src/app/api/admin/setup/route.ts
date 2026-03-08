@@ -8,7 +8,7 @@
  * Secured by INTERNAL_SECRET env var — keep this secret.
  */
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
   try {
@@ -32,7 +32,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "email is required." }, { status: 400 });
     }
 
-    const profile = await prisma.profile.findUnique({ where: { email } });
+    const db = createAdminSupabaseClient();
+
+    const { data: profile } = await db
+      .from("profiles")
+      .select("*")
+      .eq("email", email)
+      .maybeSingle();
+
     if (!profile) {
       return NextResponse.json(
         { error: `No profile found for ${email}. Log in once first so a profile is created, then call this endpoint again.` },
@@ -40,11 +47,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const updated = await prisma.profile.update({
-      where: { email },
-      data: { role: "admin" },
-      select: { id: true, email: true, name: true, role: true },
-    });
+    const { data: updated } = await db
+      .from("profiles")
+      .update({ role: "admin" })
+      .eq("email", email)
+      .select("id, email, name, role")
+      .single();
 
     return NextResponse.json({ success: true, profile: updated });
   } catch (err) {

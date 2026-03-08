@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
-import prisma from "@/lib/prisma";
 import { z } from "zod";
 
 const schema = z.object({
@@ -27,35 +26,36 @@ export async function POST(req: NextRequest) {
   }
 
   const { projectId } = parsed.data;
+  const db = createAdminSupabaseClient();
 
   // Verify the user has purchased this project
-  const purchase = await prisma.purchase.findFirst({
-    where: {
-      userId: user.id,
-      projectId,
-      status: "completed",
-    },
-  });
+  const { data: purchase } = await db
+    .from("purchases")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("project_id", projectId)
+    .eq("status", "completed")
+    .maybeSingle();
 
   if (!purchase) {
     return NextResponse.json({ error: "Purchase not found" }, { status: 403 });
   }
 
   // Fetch project zip path
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { zipUrl: true },
-  });
+  const { data: project } = await db
+    .from("projects")
+    .select("zip_url")
+    .eq("id", projectId)
+    .single();
 
-  if (!project?.zipUrl) {
+  if (!project?.zip_url) {
     return NextResponse.json({ error: "Project file not found" }, { status: 404 });
   }
 
   // Generate 60-second signed URL — never expose raw storage URL
-  const adminSupabase = createAdminSupabaseClient();
-  const { data: signedUrl, error } = await adminSupabase.storage
+  const { data: signedUrl, error } = await db.storage
     .from("project-files")
-    .createSignedUrl(project.zipUrl, 60);
+    .createSignedUrl(project.zip_url, 60);
 
   if (error || !signedUrl?.signedUrl) {
     console.error("Failed to create signed URL:", error);

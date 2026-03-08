@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { getUser } from "@/lib/supabase/server";
+import { getUser, createAdminSupabaseClient } from "@/lib/supabase/server";
 import { classifyEmail } from "@/utils/emailTrust";
 import { sendStudentOtpEmail } from "@/lib/email";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -64,18 +63,22 @@ export async function POST(request: NextRequest) {
 
     // Student domain — generate OTP and send via Resend
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+    const otpExpiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 minutes
 
-    const profile = await prisma.profile.update({
-      where: { userId: user.id },
-      data: {
-        otpCode: otp,
-        otpExpiresAt,
-        studentEmail: email,
-      },
-    });
+    const db = createAdminSupabaseClient();
 
-    await sendStudentOtpEmail(email, profile.name, otp);
+    const { data: profile } = await db
+      .from("profiles")
+      .update({
+        otp_code: otp,
+        otp_expires_at: otpExpiresAt,
+        student_email: email,
+      })
+      .eq("user_id", user.id)
+      .select("name")
+      .single();
+
+    await sendStudentOtpEmail(email, profile?.name ?? "Student", otp);
 
     return NextResponse.json({
       status: "otp_sent",

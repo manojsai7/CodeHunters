@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import prisma from "@/lib/prisma";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { ProjectForm } from "@/components/admin/project-form";
 
 export const metadata = {
@@ -13,17 +13,15 @@ export default async function EditProjectPage({
 }) {
   const params = await paramsPromise;
   try {
-  const project = await prisma.project.findUnique({
-    where: { id: params.id },
-  });
+  const db = createAdminSupabaseClient();
+
+  const { data: project } = await db
+    .from("projects")
+    .select("*")
+    .eq("id", params.id)
+    .single();
 
   if (!project) notFound();
-
-  const projectData = {
-    ...project,
-    createdAt: project.createdAt.toISOString(),
-    updatedAt: project.updatedAt.toISOString(),
-  };
 
   return (
     <div className="space-y-6">
@@ -31,7 +29,7 @@ export default async function EditProjectPage({
         <h1 className="text-2xl font-bold text-white">Edit Project</h1>
         <p className="text-sm text-muted mt-1">{project.title}</p>
       </div>
-      <ProjectForm project={projectData} />
+      <ProjectForm project={project} />
     </div>
   );
   } catch (e: unknown) {

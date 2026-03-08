@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUser } from "@/lib/supabase/server";
-import prisma from "@/lib/prisma";
+import { getUser, createAdminSupabaseClient } from "@/lib/supabase/server";
 import { safeJsonParse } from "@/lib/utils";
 
 export async function PUT(request: NextRequest) {
@@ -30,15 +29,21 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const updatedProfile = await prisma.profile.update({
-      where: { userId: user.id },
-      data: {
+    const db = createAdminSupabaseClient();
+
+    const { data: updatedProfile, error: updateError } = await db
+      .from("profiles")
+      .update({
         name: name.trim(),
         phone: phone || null,
         state: state || null,
-        avatarUrl: avatarUrl || null,
-      },
-    });
+        avatar_url: avatarUrl || null,
+      })
+      .eq("user_id", user.id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
 
     return NextResponse.json({
       success: true,
@@ -46,7 +51,7 @@ export async function PUT(request: NextRequest) {
         name: updatedProfile.name,
         phone: updatedProfile.phone,
         state: updatedProfile.state,
-        avatarUrl: updatedProfile.avatarUrl,
+        avatarUrl: updatedProfile.avatar_url,
       },
     });
   } catch (error) {

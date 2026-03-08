@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { CheckCircle, ArrowRight, Download, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import prisma from "@/lib/prisma";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { formatPrice } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -16,32 +16,48 @@ export default async function PaymentSuccessPage({
 }) {
   const searchParams = await searchParamsPromise;
   const orderId = searchParams.orderId;
-  let purchase = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let purchase: any = null;
 
   if (orderId) {
-    purchase = await prisma.purchase.findFirst({
-      where: { razorpayOrderId: orderId, status: "completed" },
-      include: {
-        course: { select: { title: true, slug: true } },
-        project: { select: { title: true, slug: true, zipUrl: true } },
-      },
-    });
+    const db = createAdminSupabaseClient();
 
-    if (!purchase) {
+    const { data: dbPurchase } = await db
+      .from("purchases")
+      .select("*, courses(title, slug), projects(title, slug, zip_url)")
+      .eq("razorpay_order_id", orderId)
+      .eq("status", "completed")
+      .maybeSingle();
+
+    if (dbPurchase) {
+      purchase = {
+        ...dbPurchase,
+        course: dbPurchase.courses,
+        project: dbPurchase.projects,
+      };
+    } else {
       // Check guest purchases
-      const guestPurchase = await prisma.guestPurchase.findFirst({
-        where: { razorpayOrderId: orderId, status: "completed" },
-      });
+      const { data: guestPurchase } = await db
+        .from("guest_purchases")
+        .select("*")
+        .eq("razorpay_order_id", orderId)
+        .eq("status", "completed")
+        .maybeSingle();
+
       if (guestPurchase) {
-        // Fetch project separately
-        const project = await prisma.project.findUnique({
-          where: { id: guestPurchase.productId },
-          select: { title: true, slug: true, zipUrl: true },
-        });
+        let project = null;
+        if (guestPurchase.product_type === "project") {
+          const { data: p } = await db
+            .from("projects")
+            .select("title, slug, zip_url")
+            .eq("id", guestPurchase.product_id)
+            .single();
+          project = p;
+        }
         purchase = {
           ...guestPurchase,
           course: null,
-          project: guestPurchase.productType === "project" ? project : null,
+          project,
         };
       }
     }
@@ -99,8 +115,8 @@ export default async function PaymentSuccessPage({
             </Link>
           )}
 
-          {purchase?.project?.zipUrl && (
-            <a href={purchase.project.zipUrl} target="_blank" rel="noopener noreferrer" className="block">
+          {purchase?.project?.zip_url && (
+            <a href={purchase.project.zip_url as string} target="_blank" rel="noopener noreferrer" className="block">
               <Button className="w-full" size="lg">
                 <Download className="h-4 w-4 mr-2" />
                 Download Project

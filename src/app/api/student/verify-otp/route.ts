@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { getUser } from "@/lib/supabase/server";
+import { getUser, createAdminSupabaseClient } from "@/lib/supabase/server";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { safeJsonParse } from "@/lib/utils";
 import { z } from "zod";
@@ -43,10 +42,13 @@ export async function POST(request: NextRequest) {
     }
 
     const { otp } = parsed.data;
+    const db = createAdminSupabaseClient();
 
-    const profile = await prisma.profile.findUnique({
-      where: { userId: user.id },
-    });
+    const { data: profile } = await db
+      .from("profiles")
+      .select("*")
+      .eq("user_id", user.id)
+      .single();
 
     if (!profile) {
       return NextResponse.json(
@@ -55,25 +57,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!profile.otpCode || !profile.otpExpiresAt) {
+    if (!profile.otp_code || !profile.otp_expires_at) {
       return NextResponse.json(
         { error: "No OTP was requested. Please request a new one." },
         { status: 400 }
       );
     }
 
-    if (new Date() > profile.otpExpiresAt) {
-      await prisma.profile.update({
-        where: { userId: user.id },
-        data: { otpCode: null, otpExpiresAt: null },
-      });
+    if (new Date() > new Date(profile.otp_expires_at)) {
+      await db
+        .from("profiles")
+        .update({ otp_code: null, otp_expires_at: null })
+        .eq("user_id", user.id);
       return NextResponse.json(
         { error: "OTP has expired. Please request a new one." },
         { status: 400 }
       );
     }
 
-    if (profile.otpCode !== otp) {
+    if (profile.otp_code !== otp) {
       return NextResponse.json(
         { error: "Invalid OTP. Please check and try again." },
         { status: 400 }
@@ -81,14 +83,14 @@ export async function POST(request: NextRequest) {
     }
 
     // OTP matches — verify student
-    await prisma.profile.update({
-      where: { userId: user.id },
-      data: {
-        studentVerified: true,
-        otpCode: null,
-        otpExpiresAt: null,
-      },
-    });
+    await db
+      .from("profiles")
+      .update({
+        student_verified: true,
+        otp_code: null,
+        otp_expires_at: null,
+      })
+      .eq("user_id", user.id);
 
     return NextResponse.json({
       verified: true,

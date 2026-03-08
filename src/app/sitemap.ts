@@ -1,5 +1,5 @@
 import { MetadataRoute } from "next";
-import prisma from "@/lib/prisma";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://codehunters.dev";
 
@@ -16,24 +16,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let projectRoutes: MetadataRoute.Sitemap = [];
 
   try {
-    const courses = await prisma.course.findMany({
-      where: { isPublished: true },
-      select: { slug: true, updatedAt: true },
-    });
-    courseRoutes = courses.map((c) => ({
+    const db = createAdminSupabaseClient();
+
+    const [{ data: courses }, { data: projects }] = await Promise.all([
+      db.from("courses").select("slug, updated_at").eq("is_published", true),
+      db.from("projects").select("slug, updated_at").eq("is_published", true),
+    ]);
+
+    courseRoutes = (courses ?? []).map((c) => ({
       url: `${BASE_URL}/courses/${c.slug}`,
-      lastModified: c.updatedAt,
+      lastModified: c.updated_at,
       changeFrequency: "weekly" as const,
       priority: 0.8,
     }));
 
-    const projects = await prisma.project.findMany({
-      where: { isPublished: true },
-      select: { slug: true, updatedAt: true },
-    });
-    projectRoutes = projects.map((p) => ({
+    projectRoutes = (projects ?? []).map((p) => ({
       url: `${BASE_URL}/projects/${p.slug}`,
-      lastModified: p.updatedAt,
+      lastModified: p.updated_at,
       changeFrequency: "weekly" as const,
       priority: 0.8,
     }));

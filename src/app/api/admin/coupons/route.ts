@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { getUser } from "@/lib/supabase/server";
+import { getUser, createAdminSupabaseClient } from "@/lib/supabase/server";
 import { couponSchema } from "@/lib/validations";
 
 export async function GET() {
@@ -9,19 +8,25 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const profile = await prisma.profile.findUnique({
-      where: { userId: user.id },
-    });
-    if (profile?.role !== "admin") {
+    const db = createAdminSupabaseClient();
+
+    const { data: profile } = await db
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profile?.role !== "admin" && profile?.role !== "owner") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const coupons = await prisma.coupon.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 200,
-    });
+    const { data: coupons } = await db
+      .from("coupons")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(200);
 
-    return NextResponse.json(coupons);
+    return NextResponse.json(coupons ?? []);
   } catch (error) {
     console.error("Admin list coupons error:", error);
     return NextResponse.json(
@@ -37,10 +42,15 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const profile = await prisma.profile.findUnique({
-      where: { userId: user.id },
-    });
-    if (profile?.role !== "admin") {
+    const db = createAdminSupabaseClient();
+
+    const { data: profile } = await db
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profile?.role !== "admin" && profile?.role !== "owner") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -55,9 +65,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Check code uniqueness
-    const existing = await prisma.coupon.findUnique({
-      where: { code: parsed.data.code },
-    });
+    const { data: existing } = await db
+      .from("coupons")
+      .select("id")
+      .eq("code", parsed.data.code)
+      .maybeSingle();
 
     if (existing) {
       return NextResponse.json(
@@ -66,16 +78,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const coupon = await prisma.coupon.create({
-      data: {
+    const { data: coupon } = await db
+      .from("coupons")
+      .insert({
         code: parsed.data.code,
         discount: parsed.data.discount,
         type: parsed.data.type,
-        expiresAt: new Date(parsed.data.expiresAt),
-        usageLimit: parsed.data.usageLimit,
+        expires_at: new Date(parsed.data.expiresAt).toISOString(),
+        usage_limit: parsed.data.usageLimit,
         source: "manual",
-      },
-    });
+      })
+      .select()
+      .single();
 
     return NextResponse.json(coupon, { status: 201 });
   } catch (error) {

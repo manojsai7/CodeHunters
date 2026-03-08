@@ -1,5 +1,5 @@
 import Link from "next/link";
-import prisma from "@/lib/prisma";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { ProjectsTable } from "./projects-table";
@@ -12,14 +12,15 @@ export const metadata = {
 
 export default async function AdminProjectsPage() {
   try {
-  const projects = await prisma.project.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      _count: { select: { purchases: true } },
-    },
-  });
+  const db = createAdminSupabaseClient();
 
-  const data = projects.map((p) => ({
+  const { data: projects } = await db
+    .from("projects")
+    .select("*, purchases(id)")
+    .order("created_at", { ascending: false });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = (projects ?? []).map((p: any) => ({
     id: p.id,
     slug: p.slug,
     title: p.title,
@@ -28,10 +29,10 @@ export default async function AdminProjectsPage() {
     difficulty: p.difficulty,
     price: p.price,
     mrp: p.mrp,
-    isPublished: p.isPublished,
-    isBestseller: p.isBestseller,
-    purchasesCount: p._count.purchases,
-    createdAt: p.createdAt.toISOString(),
+    isPublished: p.is_published,
+    isBestseller: p.is_bestseller,
+    purchasesCount: Array.isArray(p.purchases) ? p.purchases.length : 0,
+    createdAt: p.created_at,
   }));
 
   return (
@@ -40,7 +41,7 @@ export default async function AdminProjectsPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Projects</h1>
           <p className="text-sm text-muted mt-1">
-            {projects.length} total projects
+            {data.length} total projects
           </p>
         </div>
         <Link href="/admin/projects/new">

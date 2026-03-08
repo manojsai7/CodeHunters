@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
-import prisma from "@/lib/prisma";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { createReferralCode, recordReferral } from "@/lib/referral";
 import { sendWelcomeEmail } from "@/lib/email";
 
@@ -44,9 +44,12 @@ export async function GET(request: Request) {
       if (user) {
         // Wrapped in try/catch so a DB failure does NOT block the email confirmation redirect.
         try {
-          const existingProfile = await prisma.profile.findUnique({
-            where: { userId: user.id },
-          });
+          const db = createAdminSupabaseClient();
+          const { data: existingProfile } = await db
+            .from("profiles")
+            .select("user_id")
+            .eq("user_id", user.id)
+            .maybeSingle();
 
           if (!existingProfile) {
             const referralCode = await createReferralCode();
@@ -56,13 +59,11 @@ export async function GET(request: Request) {
               user.email?.split("@")[0] ||
               "User";
 
-            await prisma.profile.create({
-              data: {
-                userId: user.id,
-                email: user.email || "",
-                name,
-                referralCode,
-              },
+            await db.from("profiles").insert({
+              user_id: user.id,
+              email: user.email || "",
+              name,
+              referral_code: referralCode,
             });
 
             const ref = user.user_metadata?.referral_code as string | undefined;
@@ -72,13 +73,9 @@ export async function GET(request: Request) {
 
             if (user.email) {
               sendWelcomeEmail(user.email, name, referralCode);
-              prisma.emailLog
-                .create({
-                  data: { userId: user.id, emailType: "welcome" },
-                })
-                .catch((err: unknown) =>
-                  console.error("Failed to log welcome email:", err)
-                );
+              const { error: logErr } = await db.from("email_logs")
+                .insert({ user_id: user.id, email_type: "welcome" });
+              if (logErr) console.error("Failed to log welcome email:", logErr);
             }
           }
         } catch (profileErr) {

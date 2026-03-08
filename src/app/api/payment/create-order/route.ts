@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { getUser } from "@/lib/supabase/server";
+import { createAdminSupabaseClient, getUser } from "@/lib/supabase/server";
 import { getRazorpay } from "@/lib/razorpay";
 import { createOrderSchema } from "@/lib/validations";
 import { classifyEmail, isBlockedEmail } from "@/utils/emailTrust";
@@ -45,33 +44,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const db = createAdminSupabaseClient();
+
     // Save pre-checkout lead for remarketing
-    await prisma.preCheckoutLead.create({
-      data: {
-        name,
-        email,
-        phone,
-        state,
-        selfDeclaredStudent,
-        productId,
-        productType,
-      },
+    await db.from("pre_checkout_leads").insert({
+      name,
+      email,
+      phone,
+      state,
+      self_declared_student: selfDeclaredStudent,
+      product_id: productId,
+      product_type: productType,
     });
 
     // Fetch the product
-    let product: { id: string; price: number; mrp: number; title: string } | null = null;
-
-    if (productType === "course") {
-      product = await prisma.course.findUnique({
-        where: { id: productId },
-        select: { id: true, price: true, mrp: true, title: true },
-      });
-    } else {
-      product = await prisma.project.findUnique({
-        where: { id: productId },
-        select: { id: true, price: true, mrp: true, title: true },
-      });
-    }
+    const table = productType === "course" ? "courses" : "projects";
+    const { data: product } = await db
+      .from(table)
+      .select("id, price, mrp, title")
+      .eq("id", productId)
+      .single();
 
     if (!product) {
       return NextResponse.json(
@@ -95,15 +87,17 @@ export async function POST(request: NextRequest) {
     let validCoupon: { id: string; discount: number; code: string; type: string } | null = null;
     let flatDiscountAmount = 0;
     if (couponCode) {
-      const coupon = await prisma.coupon.findUnique({
-        where: { code: couponCode },
-      });
+      const { data: coupon } = await db
+        .from("coupons")
+        .select("id, discount, code, type, is_active, used_count, usage_limit, expires_at")
+        .eq("code", couponCode)
+        .single();
 
       if (
         coupon &&
-        coupon.isActive &&
-        coupon.usedCount < coupon.usageLimit &&
-        new Date() < coupon.expiresAt
+        coupon.is_active &&
+        coupon.used_count < coupon.usage_limit &&
+        new Date() < new Date(coupon.expires_at)
       ) {
         validCoupon = coupon;
         if (coupon.type === "flat") {
@@ -146,36 +140,32 @@ export async function POST(request: NextRequest) {
 
     // Create purchase record
     if (userId) {
-      await prisma.purchase.create({
-        data: {
-          userId,
-          ...(productType === "course" ? { courseId: productId } : { projectId: productId }),
-          amount: amountInPaise,
-          originalAmount: Math.round(originalAmount * 100),
-          discountApplied: totalDiscountPercent,
-          isStudentDiscount,
-          couponCode: validCoupon?.code ?? null,
-          razorpayOrderId: razorpayOrder.id,
-          status: "pending",
-        },
+      await db.from("purchases").insert({
+        user_id: userId,
+        ...(productType === "course" ? { course_id: productId } : { project_id: productId }),
+        amount: amountInPaise,
+        original_amount: Math.round(originalAmount * 100),
+        discount_applied: totalDiscountPercent,
+        is_student_discount: isStudentDiscount,
+        coupon_code: validCoupon?.code ?? null,
+        razorpay_order_id: razorpayOrder.id,
+        status: "pending",
       });
     } else {
-      await prisma.guestPurchase.create({
-        data: {
-          name,
-          email,
-          phone,
-          state,
-          selfDeclaredStudent,
-          emailTrustLevel: classifyEmail(email),
-          productId,
-          productType,
-          amount: amountInPaise,
-          discountApplied: totalDiscountPercent,
-          razorpayOrderId: razorpayOrder.id,
-          referralCodeUsed: referralCode ?? null,
-          status: "pending",
-        },
+      await db.from("guest_purchases").insert({
+        name,
+        email,
+        phone,
+        state,
+        self_declared_student: selfDeclaredStudent,
+        email_trust_level: classifyEmail(email),
+        product_id: productId,
+        product_type: productType,
+        amount: amountInPaise,
+        discount_applied: totalDiscountPercent,
+        razorpay_order_id: razorpayOrder.id,
+        referral_code_used: referralCode ?? null,
+        status: "pending",
       });
     }
 

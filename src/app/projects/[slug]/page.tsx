@@ -20,13 +20,10 @@ import { Button } from "@/components/ui/button";
 import { ProjectGallery } from "@/components/projects/project-gallery";
 import { ProjectStats } from "@/components/projects/project-stats";
 import { ProjectCard } from "@/components/projects/project-card";
-import { getUser } from "@/lib/supabase/server";
-import prisma from "@/lib/prisma";
+import { createServerSupabaseClient, getUser } from "@/lib/supabase/server";
 import { formatPrice } from "@/lib/utils";
 
 export const revalidate = 60;
-
-type ProjectItem = Awaited<ReturnType<typeof prisma.project.findMany>>[number];
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -37,20 +34,23 @@ export async function generateMetadata({
 }: PageProps): Promise<Metadata> {
   const params = await paramsPromise;
   try {
-    const project = await prisma.project.findUnique({
-      where: { slug: params.slug },
-    });
+    const supabase = await createServerSupabaseClient();
+    const { data: project } = await supabase
+      .from("projects")
+      .select("title, short_desc, description, thumbnail, is_published")
+      .eq("slug", params.slug)
+      .single();
 
-    if (!project || !project.isPublished) {
+    if (!project || !project.is_published) {
       return { title: "Project Not Found | Code Hunters" };
     }
 
     return {
       title: `${project.title} | Code Hunters`,
-      description: project.shortDesc || project.description,
+      description: project.short_desc || project.description,
       openGraph: {
         title: `${project.title} | Code Hunters`,
-        description: project.shortDesc || project.description,
+        description: project.short_desc || project.description,
         images: project.thumbnail ? [{ url: project.thumbnail }] : [],
       },
     };
@@ -61,16 +61,22 @@ export async function generateMetadata({
 
 export default async function ProjectDetailPage({ params: paramsPromise }: PageProps) {
   const params = await paramsPromise;
-  let project;
+  const supabase = await createServerSupabaseClient();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let project: any;
   try {
-    project = await prisma.project.findUnique({
-      where: { slug: params.slug },
-    });
+    const { data } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("slug", params.slug)
+      .single();
+    project = data;
   } catch {
     notFound();
   }
 
-  if (!project || !project.isPublished) {
+  if (!project || !project.is_published) {
     notFound();
   }
 
@@ -81,26 +87,29 @@ export default async function ProjectDetailPage({ params: paramsPromise }: PageP
   try {
     const user = await getUser();
     if (user) {
-      const profile = await prisma.profile.findUnique({
-        where: { userId: user.id },
-      });
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("name, role, gold_coins")
+        .eq("user_id", user.id)
+        .single();
       if (profile) {
         userData = {
           id: user.id,
           email: user.email || "",
           name: profile.name,
           role: profile.role,
-          goldCoins: profile.goldCoins,
+          goldCoins: profile.gold_coins,
         };
       }
 
-      const purchase = await prisma.purchase.findFirst({
-        where: {
-          userId: user.id,
-          projectId: project.id,
-          status: "paid",
-        },
-      });
+      const { data: purchase } = await supabase
+        .from("purchases")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("project_id", project.id)
+        .eq("status", "completed")
+        .limit(1)
+        .maybeSingle();
       hasPurchased = !!purchase;
     }
   } catch {
@@ -108,17 +117,18 @@ export default async function ProjectDetailPage({ params: paramsPromise }: PageP
   }
 
   // Related projects (same category, exclude current)
-  let relatedProjects: ProjectItem[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let relatedProjects: any[] = [];
   try {
-    relatedProjects = await prisma.project.findMany({
-      where: {
-        isPublished: true,
-        category: project.category,
-        id: { not: project.id },
-      },
-      take: 3,
-      orderBy: { purchasesCount: "desc" },
-    });
+    const { data } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("is_published", true)
+      .eq("category", project.category)
+      .neq("id", project.id)
+      .order("purchases_count", { ascending: false })
+      .limit(3);
+    relatedProjects = data ?? [];
   } catch {
     // Database unavailable — skip related projects
   }
@@ -127,6 +137,16 @@ export default async function ProjectDetailPage({ params: paramsPromise }: PageP
   const discountPercent = hasSale
     ? Math.round(((project.mrp - project.price) / project.mrp) * 100)
     : 0;
+
+  // Map snake_case to convenient local names
+  const previewImages: string[] = project.preview_images ?? [];
+  const techTags: string[] = project.tech_tags ?? [];
+  const shortDesc: string | null = project.short_desc;
+  const purchasesCount: number = project.purchases_count ?? 0;
+  const reviewCount: number = project.review_count ?? 0;
+  const isBestseller: boolean = project.is_bestseller ?? false;
+  const zipUrl: string = project.zip_url ?? '';
+  const updatedAt: string = project.updated_at;
 
   const whatsIncluded = [
     "Complete source code",
@@ -158,8 +178,8 @@ export default async function ProjectDetailPage({ params: paramsPromise }: PageP
         <div className="mb-10">
           <ProjectGallery
             images={
-              project.previewImages.length > 0
-                ? project.previewImages
+              previewImages.length > 0
+                ? previewImages
                 : project.thumbnail
                   ? [project.thumbnail]
                   : []
@@ -176,7 +196,7 @@ export default async function ProjectDetailPage({ params: paramsPromise }: PageP
               <div className="mb-4 flex flex-wrap gap-2">
                 <Badge variant="default">{project.category}</Badge>
                 <Badge variant="secondary">{project.difficulty}</Badge>
-                {project.isBestseller && (
+                {isBestseller && (
                   <Badge variant="bestseller">Bestseller</Badge>
                 )}
               </div>
@@ -216,21 +236,21 @@ export default async function ProjectDetailPage({ params: paramsPromise }: PageP
               </h2>
               <div className="prose prose-invert max-w-none text-muted leading-relaxed">
                 <p>{project.description}</p>
-                {project.shortDesc && (
-                  <p className="mt-3">{project.shortDesc}</p>
+                {shortDesc && (
+                  <p className="mt-3">{shortDesc}</p>
                 )}
               </div>
             </div>
 
             {/* Tech Stack Details */}
-            {project.techTags.length > 0 && (
+            {techTags.length > 0 && (
               <div className="space-y-4">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                   <Code2 className="h-5 w-5 text-secondary" />
                   Tech Stack
                 </h2>
                 <div className="flex flex-wrap gap-2">
-                  {project.techTags.map((tag: string) => (
+                  {techTags.map((tag: string) => (
                     <div
                       key={tag}
                       className="flex items-center gap-2 rounded-lg border border-white/10 bg-surface/50 px-3 py-2 text-sm text-white"
@@ -263,13 +283,13 @@ export default async function ProjectDetailPage({ params: paramsPromise }: PageP
             </div>
 
             {/* Preview Images Gallery (if additional images beyond hero) */}
-            {project.previewImages.length > 1 && (
+            {previewImages.length > 1 && (
               <div className="space-y-4">
                 <h2 className="text-xl font-bold text-white">
                   Preview Screenshots
                 </h2>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  {project.previewImages.map((img: string, idx: number) => (
+                  {previewImages.map((img: string, idx: number) => (
                     <div
                       key={idx}
                       className="relative aspect-video overflow-hidden rounded-lg border border-white/10"
@@ -331,7 +351,7 @@ export default async function ProjectDetailPage({ params: paramsPromise }: PageP
                   {/* Buy / Download CTA */}
                   {hasPurchased ? (
                     <Link
-                      href={project.zipUrl}
+                      href={zipUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block"
@@ -356,23 +376,23 @@ export default async function ProjectDetailPage({ params: paramsPromise }: PageP
                   {/* Stats */}
                   <div className="border-t border-white/5 pt-5">
                     <ProjectStats
-                      purchasesCount={project.purchasesCount}
+                      purchasesCount={purchasesCount}
                       rating={project.rating}
-                      reviewCount={project.reviewCount}
+                      reviewCount={reviewCount}
                       difficulty={project.difficulty}
                       category={project.category}
-                      updatedAt={project.updatedAt}
+                      updatedAt={updatedAt}
                     />
                   </div>
 
                   {/* Tech Stack Pills */}
-                  {project.techTags.length > 0 && (
+                  {techTags.length > 0 && (
                     <div className="border-t border-white/5 pt-5">
                       <h4 className="mb-3 text-sm font-semibold text-white">
                         Tech Stack
                       </h4>
                       <div className="flex flex-wrap gap-1.5">
-                        {project.techTags.map((tag: string) => (
+                        {techTags.map((tag: string) => (
                           <Badge
                             key={tag}
                             variant="outline"
@@ -407,7 +427,8 @@ export default async function ProjectDetailPage({ params: paramsPromise }: PageP
               Related <span className="text-primary">Projects</span>
             </h2>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {relatedProjects.map((rp: ProjectItem, idx: number) => (
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {relatedProjects.map((rp: any, idx: number) => (
                 <ProjectCard key={rp.id} project={rp} index={idx} />
               ))}
             </div>

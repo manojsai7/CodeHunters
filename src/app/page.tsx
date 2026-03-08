@@ -6,8 +6,7 @@ import PopularProjects from "@/components/landing/popular-projects";
 import Testimonials from "@/components/landing/testimonials";
 import ReferralBanner from "@/components/landing/referral-banner";
 import PricingSection from "@/components/landing/pricing-section";
-import { getUser } from "@/lib/supabase/server";
-import prisma from "@/lib/prisma";
+import { createServerSupabaseClient, getUser } from "@/lib/supabase/server";
 
 export const revalidate = 60;
 
@@ -17,16 +16,19 @@ export default async function HomePage() {
   try {
     const user = await getUser();
     if (user) {
-      const profile = await prisma.profile.findUnique({
-        where: { userId: user.id },
-      });
+      const supabase = await createServerSupabaseClient();
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("name, role, gold_coins, avatar_url")
+        .eq("user_id", user.id)
+        .single();
       if (profile) {
         userData = {
           id: user.id,
           email: user.email || "",
           name: profile.name,
           role: profile.role,
-          goldCoins: profile.goldCoins,
+          goldCoins: profile.gold_coins,
         };
       }
     }

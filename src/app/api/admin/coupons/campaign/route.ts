@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { getUser } from "@/lib/supabase/server";
+import { getUser, createAdminSupabaseClient } from "@/lib/supabase/server";
 import { Resend } from "resend";
 import CoinRewardEmail from "@emails/CoinRewardEmail";
 import { z } from "zod";
@@ -27,10 +26,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const profile = await prisma.profile.findUnique({
-      where: { userId: user.id },
-    });
-    if (profile?.role !== "admin") {
+    const db = createAdminSupabaseClient();
+
+    const { data: profile } = await db
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profile?.role !== "admin" && profile?.role !== "owner") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -46,25 +50,34 @@ export async function POST(request: NextRequest) {
 
     const { discountPercent, expiryDays, targetSegment } = parsed.data;
 
-    // Get target users
-    const thirtyDaysAgo = new Date(
-      Date.now() - 30 * 24 * 60 * 60 * 1000
-    );
-    const whereClause =
-      targetSegment === "inactive"
-        ? {
-            purchases: { none: { createdAt: { gte: thirtyDaysAgo } } },
-          }
-        : {};
+    let targetUsers: { user_id: string; email: string; name: string }[] = [];
 
-    const targetUsers = await prisma.profile.findMany({
-      where: whereClause,
-      select: { userId: true, email: true, name: true },
-    });
+    if (targetSegment === "inactive") {
+      // Get profiles that have no purchases in the last 30 days
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: recentBuyers } = await db
+        .from("purchases")
+        .select("user_id")
+        .gte("created_at", thirtyDaysAgo);
+
+      const recentBuyerIds = new Set((recentBuyers ?? []).map((p: { user_id: string }) => p.user_id));
+
+      const { data: allProfiles } = await db
+        .from("profiles")
+        .select("user_id, email, name");
+
+      targetUsers = (allProfiles ?? []).filter((p: { user_id: string }) => !recentBuyerIds.has(p.user_id));
+    } else {
+      const { data: allProfiles } = await db
+        .from("profiles")
+        .select("user_id, email, name");
+
+      targetUsers = allProfiles ?? [];
+    }
 
     const expiresAt = new Date(
       Date.now() + expiryDays * 24 * 60 * 60 * 1000
-    );
+    ).toISOString();
     const appUrl =
       process.env.NEXT_PUBLIC_APP_URL || "https://www.codehunters.dev";
     const fromEmail =
@@ -80,16 +93,14 @@ export async function POST(request: NextRequest) {
           .substring(2, 8)
           .toUpperCase()}`;
 
-        await prisma.coupon.create({
-          data: {
-            code,
-            discount: discountPercent,
-            type: "percent",
-            expiresAt,
-            usageLimit: 1,
-            userId: targetUser.userId,
-            source: "campaign",
-          },
+        await db.from("coupons").insert({
+          code,
+          discount: discountPercent,
+          type: "percent",
+          expires_at: expiresAt,
+          usage_limit: 1,
+          user_id: targetUser.user_id,
+          source: "campaign",
         });
 
         try {

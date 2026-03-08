@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import prisma from "@/lib/prisma";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Gift, TrendingUp, Coins, Users } from "lucide-react";
@@ -12,31 +12,48 @@ export const metadata: Metadata = {
 
 export default async function AdminReferralsPage() {
   try {
-  const referrals = await prisma.referralUse.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      referrer: { select: { name: true, email: true } },
-    },
-  });
+  const db = createAdminSupabaseClient();
 
-  // Top referrers
-  const topReferrers = await prisma.profile.findMany({
-    where: {
-      referralsMade: { some: {} },
-    },
-    select: {
-      name: true,
-      email: true,
-      goldCoins: true,
-      _count: { select: { referralsMade: true } },
-    },
-    orderBy: {
-      referralsMade: { _count: "desc" },
-    },
-    take: 10,
-  });
+  const { data: referrals } = await db
+    .from("referral_uses")
+    .select("*, profiles!referral_uses_referrer_id_fkey(name, email)")
+    .order("created_at", { ascending: false });
 
-  const totalCoinsAwarded = referrals.filter((r) => r.coinsAwarded).length * 15;
+  const allReferrals = referrals ?? [];
+
+  // Top referrers — aggregate from referral_uses
+  const referrerMap: Record<string, { name: string; email: string; count: number }> = {};
+  for (const r of allReferrals) {
+    const rid = r.referrer_id;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const profile = r.profiles as any;
+    if (!referrerMap[rid]) {
+      referrerMap[rid] = { name: profile?.name ?? "Unknown", email: profile?.email ?? "", count: 0 };
+    }
+    referrerMap[rid].count++;
+  }
+
+  // Get gold coins for top referrers
+  const topReferrerIds = Object.entries(referrerMap)
+    .sort(([, a], [, b]) => b.count - a.count)
+    .slice(0, 10);
+
+  const { data: referrerProfiles } = await db
+    .from("profiles")
+    .select("user_id, gold_coins")
+    .in("user_id", topReferrerIds.map(([id]) => id));
+
+  const coinsMap: Record<string, number> = {};
+  for (const p of referrerProfiles ?? []) {
+    coinsMap[p.user_id] = p.gold_coins ?? 0;
+  }
+
+  const topReferrers = topReferrerIds.map(([id, info]) => ({
+    ...info,
+    goldCoins: coinsMap[id] ?? 0,
+  }));
+
+  const totalCoinsAwarded = allReferrals.filter((r) => r.coins_awarded).length * 15;
 
   return (
     <div className="space-y-6">
@@ -54,7 +71,7 @@ export default async function AdminReferralsPage() {
             </div>
             <div>
               <p className="text-muted text-sm">Total Referrals</p>
-              <p className="text-2xl font-bold text-white">{referrals.length}</p>
+              <p className="text-2xl font-bold text-white">{allReferrals.length}</p>
             </div>
           </div>
         </div>
@@ -107,7 +124,7 @@ export default async function AdminReferralsPage() {
                   <p className="text-white font-medium">{referrer.name}</p>
                   <p className="text-sm text-muted">{referrer.email}</p>
                 </td>
-                <td className="px-4 py-3 text-white">{referrer._count.referralsMade}</td>
+                <td className="px-4 py-3 text-white">{referrer.count}</td>
                 <td className="px-4 py-3">
                   <span className="text-gold font-medium">{referrer.goldCoins}</span>
                 </td>
@@ -133,25 +150,29 @@ export default async function AdminReferralsPage() {
               </tr>
             </thead>
             <tbody>
-              {referrals.slice(0, 20).map((ref) => (
+              {allReferrals.slice(0, 20).map((ref) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const refProfile = ref.profiles as any;
+                return (
                 <tr key={ref.id} className="border-b border-white/5 hover:bg-white/5">
                   <td className="px-4 py-3">
-                    <p className="text-white">{ref.referrer.name}</p>
-                    <p className="text-sm text-muted">{ref.referrer.email}</p>
+                    <p className="text-white">{refProfile?.name}</p>
+                    <p className="text-sm text-muted">{refProfile?.email}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="text-white">{ref.referredName}</p>
-                    <p className="text-sm text-muted">{ref.referredUserId}</p>
+                    <p className="text-white">{ref.referred_name}</p>
+                    <p className="text-sm text-muted">{ref.referred_user_id}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <Badge variant="gold">{ref.coinsAwarded ? "+15" : "Pending"}</Badge>
+                    <Badge variant="gold">{ref.coins_awarded ? "+15" : "Pending"}</Badge>
                   </td>
                   <td className="px-4 py-3 text-muted text-sm">
-                    {formatDate(ref.createdAt)}
+                    {formatDate(ref.created_at)}
                   </td>
                 </tr>
-              ))}
-              {referrals.length === 0 && (
+                );
+              })}
+              {allReferrals.length === 0 && (
                 <tr>
                   <td colSpan={4} className="px-4 py-12 text-center text-muted">
                     No referrals yet

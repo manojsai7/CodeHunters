@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { z } from "zod";
 import { safeJsonParse } from "@/lib/utils";
 
@@ -25,10 +25,13 @@ export async function POST(request: NextRequest) {
     }
 
     const { code } = parsed.data;
+    const db = createAdminSupabaseClient();
 
-    const coupon = await prisma.coupon.findUnique({
-      where: { code },
-    });
+    const { data: coupon } = await db
+      .from("coupons")
+      .select("*")
+      .eq("code", code)
+      .maybeSingle();
 
     if (!coupon) {
       return NextResponse.json({
@@ -37,21 +40,21 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (!coupon.isActive) {
+    if (!coupon.is_active) {
       return NextResponse.json({
         valid: false,
         message: "This coupon is no longer active",
       });
     }
 
-    if (new Date() > coupon.expiresAt) {
+    if (new Date() > new Date(coupon.expires_at)) {
       return NextResponse.json({
         valid: false,
         message: "This coupon has expired",
       });
     }
 
-    if (coupon.usedCount >= coupon.usageLimit) {
+    if (coupon.used_count >= coupon.usage_limit) {
       return NextResponse.json({
         valid: false,
         message: "This coupon has reached its usage limit",

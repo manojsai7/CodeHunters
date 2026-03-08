@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { getUser } from "@/lib/supabase/server";
+import { getUser, createAdminSupabaseClient } from "@/lib/supabase/server";
 import { projectSchema } from "@/lib/validations";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -15,25 +14,37 @@ export async function GET(
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const profile = await prisma.profile.findUnique({
-      where: { userId: user.id },
-    });
-    if (profile?.role !== "admin") {
+    const db = createAdminSupabaseClient();
+
+    const { data: profile } = await db
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profile?.role !== "admin" && profile?.role !== "owner") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const project = await prisma.project.findUnique({
-      where: { id },
-      include: {
-        _count: { select: { purchases: true } },
-      },
-    });
+    const { data: project } = await db
+      .from("projects")
+      .select("*, purchases(id)")
+      .eq("id", id)
+      .single();
 
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    return NextResponse.json(project);
+    // Add _count for compatibility
+    const result = {
+      ...project,
+      _count: {
+        purchases: Array.isArray(project.purchases) ? project.purchases.length : 0,
+      },
+    };
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Admin get project error:", error);
     return NextResponse.json(
@@ -53,16 +64,23 @@ export async function PUT(
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const profile = await prisma.profile.findUnique({
-      where: { userId: user.id },
-    });
-    if (profile?.role !== "admin") {
+    const db = createAdminSupabaseClient();
+
+    const { data: profile } = await db
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profile?.role !== "admin" && profile?.role !== "owner") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const existing = await prisma.project.findUnique({
-      where: { id },
-    });
+    const { data: existing } = await db
+      .from("projects")
+      .select("slug")
+      .eq("id", id)
+      .maybeSingle();
 
     if (!existing) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
@@ -80,9 +98,12 @@ export async function PUT(
 
     // If slug is changed, check uniqueness
     if (parsed.data.slug && parsed.data.slug !== existing.slug) {
-      const slugTaken = await prisma.project.findUnique({
-        where: { slug: parsed.data.slug },
-      });
+      const { data: slugTaken } = await db
+        .from("projects")
+        .select("id")
+        .eq("slug", parsed.data.slug)
+        .maybeSingle();
+
       if (slugTaken) {
         return NextResponse.json(
           { error: "A project with this slug already exists" },
@@ -91,10 +112,12 @@ export async function PUT(
       }
     }
 
-    const updated = await prisma.project.update({
-      where: { id },
-      data: parsed.data,
-    });
+    const { data: updated } = await db
+      .from("projects")
+      .update(parsed.data)
+      .eq("id", id)
+      .select()
+      .single();
 
     return NextResponse.json(updated);
   } catch (error) {
@@ -116,26 +139,33 @@ export async function DELETE(
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const profile = await prisma.profile.findUnique({
-      where: { userId: user.id },
-    });
-    if (profile?.role !== "admin") {
+    const db = createAdminSupabaseClient();
+
+    const { data: profile } = await db
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profile?.role !== "admin" && profile?.role !== "owner") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const existing = await prisma.project.findUnique({
-      where: { id },
-    });
+    const { data: existing } = await db
+      .from("projects")
+      .select("id")
+      .eq("id", id)
+      .maybeSingle();
 
     if (!existing) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
     // Soft delete: unpublish the project
-    await prisma.project.update({
-      where: { id },
-      data: { isPublished: false },
-    });
+    await db
+      .from("projects")
+      .update({ is_published: false })
+      .eq("id", id);
 
     return NextResponse.json({ message: "Project unpublished successfully" });
   } catch (error) {

@@ -4,8 +4,7 @@
  * Owner role can only be granted via SQL — never via this API.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { getUser } from "@/lib/supabase/server";
-import prisma from "@/lib/prisma";
+import { getUser, createAdminSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(req: NextRequest) {
   const user = await getUser();
@@ -13,7 +12,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const me = await prisma.profile.findUnique({ where: { userId: user.id } });
+  const db = createAdminSupabaseClient();
+
+  const { data: me } = await db
+    .from("profiles")
+    .select("role")
+    .eq("user_id", user.id)
+    .single();
+
   if (me?.role !== "owner") {
     return NextResponse.json({ error: "Only the owner can set roles." }, { status: 403 });
   }
@@ -42,7 +48,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Role must be 'admin' or 'student'." }, { status: 400 });
   }
 
-  const target = await prisma.profile.findUnique({ where: { email } });
+  const { data: target } = await db
+    .from("profiles")
+    .select("role")
+    .eq("email", email)
+    .maybeSingle();
+
   if (!target) {
     return NextResponse.json({ error: `No profile found for ${email}.` }, { status: 404 });
   }
@@ -52,7 +63,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Cannot change role of another owner." }, { status: 403 });
   }
 
-  await prisma.profile.update({ where: { email }, data: { role } });
+  await db.from("profiles").update({ role }).eq("email", email);
 
   // If submitted via HTML form, redirect back to the admins page
   if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {

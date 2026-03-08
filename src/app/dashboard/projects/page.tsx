@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { getUser } from "@/lib/supabase/server";
-import prisma from "@/lib/prisma";
+import { getUser, createServerSupabaseClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 import { FolderDown } from "lucide-react";
 import { SecureDownloadButton } from "@/components/dashboard/secure-download-button";
@@ -21,24 +20,22 @@ export default async function MyProjectsPage() {
   const user = await getUser();
   if (!user) redirect("/login");
 
-  const purchases = await prisma.purchase.findMany({
-    where: {
-      userId: user.id,
-      projectId: { not: null },
-      status: "completed",
-    },
-    include: {
-      project: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const supabase = await createServerSupabaseClient();
+  const { data: purchases } = await supabase
+    .from("purchases")
+    .select("*, projects(*)")
+    .eq("user_id", user.id)
+    .not("project_id", "is", null)
+    .eq("status", "completed")
+    .order("created_at", { ascending: false });
 
-  type PurchaseRow = typeof purchases[number];
-  const projects = purchases
-    .filter((p: PurchaseRow) => p.project)
-    .map((p: PurchaseRow) => ({
-      ...p.project!,
-      purchasedAt: p.createdAt,
+  const projects = (purchases ?? [])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .filter((p: any) => p.projects)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((p: any) => ({
+      ...p.projects,
+      purchasedAt: p.created_at,
     }));
 
   return (
@@ -56,7 +53,8 @@ export default async function MyProjectsPage() {
 
       {projects.length > 0 ? (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((project: typeof projects[number]) => (
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          {projects.map((project: any) => (
             <Card
               key={project.id}
               className="group overflow-hidden hover:border-secondary/30 transition-all duration-300"
@@ -82,9 +80,9 @@ export default async function MyProjectsPage() {
                 </h3>
 
                 {/* Tech tags */}
-                {project.techTags.length > 0 && (
+                {(project.tech_tags ?? []).length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {project.techTags.slice(0, 4).map((tag: string) => (
+                    {(project.tech_tags ?? []).slice(0, 4).map((tag: string) => (
                       <span
                         key={tag}
                         className="rounded-md bg-surface-hover px-2 py-0.5 text-[10px] font-medium text-muted"
@@ -92,9 +90,9 @@ export default async function MyProjectsPage() {
                         {tag}
                       </span>
                     ))}
-                    {project.techTags.length > 4 && (
+                    {(project.tech_tags ?? []).length > 4 && (
                       <span className="text-[10px] text-muted">
-                        +{project.techTags.length - 4}
+                        +{(project.tech_tags ?? []).length - 4}
                       </span>
                     )}
                   </div>

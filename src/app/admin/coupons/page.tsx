@@ -1,4 +1,4 @@
-import prisma from "@/lib/prisma";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { CouponsClient } from "./coupons-client";
 
 export const dynamic = 'force-dynamic';
@@ -9,32 +9,33 @@ export const metadata = {
 
 export default async function AdminCouponsPage() {
   try {
-  const coupons = await prisma.coupon.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      profile: { select: { name: true, email: true } },
-    },
-  });
+  const db = createAdminSupabaseClient();
 
-  const data = coupons.map((c) => ({
+  const { data: coupons } = await db
+    .from("coupons")
+    .select("*, profiles(name, email)")
+    .order("created_at", { ascending: false });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = (coupons ?? []).map((c: any) => ({
     id: c.id,
     code: c.code,
     discount: c.discount,
     type: c.type,
-    expiresAt: c.expiresAt.toISOString(),
-    usageLimit: c.usageLimit,
-    usedCount: c.usedCount,
-    isActive: c.isActive,
+    expiresAt: c.expires_at,
+    usageLimit: c.usage_limit,
+    usedCount: c.used_count,
+    isActive: c.is_active,
     source: c.source,
-    userName: c.profile?.name ?? null,
-    createdAt: c.createdAt.toISOString(),
+    userName: c.profiles?.name ?? null,
+    createdAt: c.created_at,
   }));
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Coupons</h1>
-        <p className="text-sm text-muted mt-1">{coupons.length} total coupons</p>
+        <p className="text-sm text-muted mt-1">{data.length} total coupons</p>
       </div>
 
       <CouponsClient data={data} />

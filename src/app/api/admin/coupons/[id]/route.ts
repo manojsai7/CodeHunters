@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { getUser } from "@/lib/supabase/server";
+import { getUser, createAdminSupabaseClient } from "@/lib/supabase/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -14,16 +13,23 @@ export async function PUT(
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const profile = await prisma.profile.findUnique({
-      where: { userId: user.id },
-    });
-    if (profile?.role !== "admin") {
+    const db = createAdminSupabaseClient();
+
+    const { data: profile } = await db
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profile?.role !== "admin" && profile?.role !== "owner") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const existing = await prisma.coupon.findUnique({
-      where: { id },
-    });
+    const { data: existing } = await db
+      .from("coupons")
+      .select("id")
+      .eq("id", id)
+      .maybeSingle();
 
     if (!existing) {
       return NextResponse.json({ error: "Coupon not found" }, { status: 404 });
@@ -33,15 +39,17 @@ export async function PUT(
 
     // Only allow updating specific fields
     const updateData: Record<string, unknown> = {};
-    if (typeof body.isActive === "boolean") updateData.isActive = body.isActive;
+    if (typeof body.isActive === "boolean") updateData.is_active = body.isActive;
     if (typeof body.discount === "number") updateData.discount = body.discount;
-    if (typeof body.usageLimit === "number") updateData.usageLimit = body.usageLimit;
-    if (body.expiresAt) updateData.expiresAt = new Date(body.expiresAt);
+    if (typeof body.usageLimit === "number") updateData.usage_limit = body.usageLimit;
+    if (body.expiresAt) updateData.expires_at = new Date(body.expiresAt).toISOString();
 
-    const updated = await prisma.coupon.update({
-      where: { id },
-      data: updateData,
-    });
+    const { data: updated } = await db
+      .from("coupons")
+      .update(updateData)
+      .eq("id", id)
+      .select()
+      .single();
 
     return NextResponse.json(updated);
   } catch (error) {
@@ -63,26 +71,33 @@ export async function DELETE(
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const profile = await prisma.profile.findUnique({
-      where: { userId: user.id },
-    });
-    if (profile?.role !== "admin") {
+    const db = createAdminSupabaseClient();
+
+    const { data: profile } = await db
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profile?.role !== "admin" && profile?.role !== "owner") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const existing = await prisma.coupon.findUnique({
-      where: { id },
-    });
+    const { data: existing } = await db
+      .from("coupons")
+      .select("id")
+      .eq("id", id)
+      .maybeSingle();
 
     if (!existing) {
       return NextResponse.json({ error: "Coupon not found" }, { status: 404 });
     }
 
     // Deactivate rather than hard delete
-    await prisma.coupon.update({
-      where: { id },
-      data: { isActive: false },
-    });
+    await db
+      .from("coupons")
+      .update({ is_active: false })
+      .eq("id", id);
 
     return NextResponse.json({ message: "Coupon deactivated successfully" });
   } catch (error) {

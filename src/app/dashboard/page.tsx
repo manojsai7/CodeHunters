@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { getUser } from "@/lib/supabase/server";
-import prisma from "@/lib/prisma";
+import { getUser, createServerSupabaseClient } from "@/lib/supabase/server";
 import { formatDate, formatPrice } from "@/lib/utils";
 import {
   BookOpen,
@@ -27,62 +26,76 @@ export default async function DashboardPage() {
   const user = await getUser();
   if (!user) redirect("/login");
 
-  const profile = await prisma.profile.findUnique({
-    where: { userId: user.id },
-  });
-  // Profile is guaranteed by dashboard/layout.tsx (which auto-creates it).
-  // If somehow still null here, bail gracefully.
+  const supabase = await createServerSupabaseClient();
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("user_id", user.id)
+    .single();
   if (!profile) redirect("/dashboard/my-learning");
 
   // Fetch counts and data in parallel
-  const [coursePurchases, projectPurchases, lessonProgress, recentPurchases] =
-    await Promise.all([
-      prisma.purchase.findMany({
-        where: { userId: user.id, courseId: { not: null }, status: "completed" },
-        include: {
-          course: {
-            include: { lessons: { where: { isFree: false } } },
-          },
-        },
-      }),
-      prisma.purchase.count({
-        where: {
-          userId: user.id,
-          projectId: { not: null },
-          status: "completed",
-        },
-      }),
-      prisma.lessonProgress.findMany({
-        where: { userId: user.id, completed: true },
-      }),
-      prisma.purchase.findMany({
-        where: { userId: user.id, status: "completed" },
-        include: { course: true, project: true },
-        orderBy: { createdAt: "desc" },
-        take: 5,
-      }),
-    ]);
+  const [
+    { data: coursePurchases },
+    { count: projectPurchases },
+    { data: lessonProgress },
+    { data: recentPurchases },
+  ] = await Promise.all([
+    supabase
+      .from("purchases")
+      .select("*, courses(id, title, slug, thumbnail, category, lessons(id))")
+      .eq("user_id", user.id)
+      .not("course_id", "is", null)
+      .eq("status", "completed"),
+    supabase
+      .from("purchases")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .not("project_id", "is", null)
+      .eq("status", "completed"),
+    supabase
+      .from("lesson_progress")
+      .select("lesson_id")
+      .eq("user_id", user.id)
+      .eq("completed", true),
+    supabase
+      .from("purchases")
+      .select("*, courses(title), projects(title)")
+      .eq("user_id", user.id)
+      .eq("status", "completed")
+      .order("created_at", { ascending: false })
+      .limit(5),
+  ]);
 
-  const coursesEnrolled = coursePurchases.length;
+  const safePurchases = coursePurchases ?? [];
+  const safeProgress = lessonProgress ?? [];
+  const safeRecent = recentPurchases ?? [];
+  const coursesEnrolled = safePurchases.length;
 
   // Calculate completion rate
-  const totalLessons = coursePurchases.reduce(
-    (sum: number, p: typeof coursePurchases[number]) => sum + (p.course?.lessons?.length || 0),
+  const totalLessons = safePurchases.reduce(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (sum: number, p: any) => sum + (p.courses?.lessons?.length || 0),
     0
   );
-  const completedLessons = lessonProgress.length;
+  const completedLessons = safeProgress.length;
   const completionRate =
     totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
   // Courses in progress (with progress info)
-  const completedLessonIds = new Set(lessonProgress.map((lp: { lessonId: string }) => lp.lessonId));
-  type CourseInProgress = { course: NonNullable<typeof coursePurchases[number]["course"]>; completed: number; total: number; progress: number };
-  const coursesInProgress: CourseInProgress[] = coursePurchases
-    .map((p: typeof coursePurchases[number]) => {
-      const course = p.course;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const completedLessonIds = new Set(safeProgress.map((lp: any) => lp.lesson_id));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type CourseInProgress = { course: any; completed: number; total: number; progress: number };
+  const coursesInProgress: CourseInProgress[] = safePurchases
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((p: any) => {
+      const course = p.courses;
       if (!course) return null;
       const total = course.lessons?.length || 0;
-      const completed = course.lessons?.filter((l: { id: string }) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const completed = course.lessons?.filter((l: any) =>
         completedLessonIds.has(l.id)
       ).length || 0;
       const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -102,7 +115,7 @@ export default async function DashboardPage() {
     },
     {
       label: "Projects Purchased",
-      value: projectPurchases,
+      value: projectPurchases ?? 0,
       icon: FolderDown,
       color: "text-secondary",
       bg: "bg-secondary/10",
@@ -110,7 +123,7 @@ export default async function DashboardPage() {
     },
     {
       label: "Gold Coins",
-      value: profile.goldCoins,
+      value: profile.gold_coins,
       icon: Coins,
       color: "text-gold",
       bg: "bg-gold/10",
@@ -230,17 +243,18 @@ export default async function DashboardPage() {
       {/* Recent Activity */}
       <section>
         <h2 className="mb-4 text-lg font-bold text-white">Recent Activity</h2>
-        {recentPurchases.length > 0 ? (
+        {safeRecent.length > 0 ? (
           <Card>
             <CardContent className="p-0">
               <div className="divide-y divide-border">
-                {recentPurchases.map((purchase: typeof recentPurchases[number]) => (
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                {safeRecent.map((purchase: any) => (
                   <div
                     key={purchase.id}
                     className="flex items-center gap-4 px-5 py-4"
                   >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                      {purchase.courseId ? (
+                      {purchase.course_id ? (
                         <BookOpen className="h-5 w-5 text-primary" />
                       ) : (
                         <FolderDown className="h-5 w-5 text-secondary" />
@@ -248,13 +262,13 @@ export default async function DashboardPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-white">
-                        {purchase.course?.title ||
-                          purchase.project?.title ||
+                        {purchase.courses?.title ||
+                          purchase.projects?.title ||
                           "Purchase"}
                       </p>
                       <p className="text-xs text-muted">
-                        {purchase.courseId ? "Course" : "Project"} •{" "}
-                        {formatDate(purchase.createdAt)}
+                        {purchase.course_id ? "Course" : "Project"} •{" "}
+                        {formatDate(purchase.created_at)}
                       </p>
                     </div>
                     <p className="text-sm font-semibold text-white">

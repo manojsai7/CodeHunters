@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { getUser } from "@/lib/supabase/server";
-import prisma from "@/lib/prisma";
+import { getUser, createAdminSupabaseClient } from "@/lib/supabase/server";
 import { isAdmin } from "@/lib/roles";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 
@@ -20,9 +19,12 @@ export default async function AdminLayout({
     redirect("/login");
   }
 
-  const profile = await prisma.profile.findUnique({
-    where: { userId: user.id },
-  });
+  const db = createAdminSupabaseClient();
+  const { data: profile } = await db
+    .from("profiles")
+    .select("role")
+    .eq("user_id", user.id)
+    .maybeSingle();
 
   if (!profile || !isAdmin(profile.role)) {
     redirect("/");

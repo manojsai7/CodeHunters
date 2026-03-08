@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { getUser } from "@/lib/supabase/server";
+import { getUser, createAdminSupabaseClient } from "@/lib/supabase/server";
 import { projectSchema } from "@/lib/validations";
 
 export async function GET() {
@@ -9,22 +8,33 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const profile = await prisma.profile.findUnique({
-      where: { userId: user.id },
-    });
-    if (profile?.role !== "admin") {
+    const db = createAdminSupabaseClient();
+
+    const { data: profile } = await db
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profile?.role !== "admin" && profile?.role !== "owner") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const projects = await prisma.project.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 200,
-      include: {
-        _count: { select: { purchases: true } },
-      },
-    });
+    const { data: projects } = await db
+      .from("projects")
+      .select("*, purchases(id)")
+      .order("created_at", { ascending: false })
+      .limit(200);
 
-    return NextResponse.json(projects);
+    // Add _count for compatibility
+    const result = (projects ?? []).map((p: Record<string, unknown>) => ({
+      ...p,
+      _count: {
+        purchases: Array.isArray(p.purchases) ? (p.purchases as unknown[]).length : 0,
+      },
+    }));
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Admin list projects error:", error);
     return NextResponse.json(
@@ -40,10 +50,15 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const profile = await prisma.profile.findUnique({
-      where: { userId: user.id },
-    });
-    if (profile?.role !== "admin") {
+    const db = createAdminSupabaseClient();
+
+    const { data: profile } = await db
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profile?.role !== "admin" && profile?.role !== "owner") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -58,9 +73,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Check slug uniqueness
-    const existing = await prisma.project.findUnique({
-      where: { slug: parsed.data.slug },
-    });
+    const { data: existing } = await db
+      .from("projects")
+      .select("id")
+      .eq("slug", parsed.data.slug)
+      .maybeSingle();
 
     if (existing) {
       return NextResponse.json(
@@ -69,9 +86,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const project = await prisma.project.create({
-      data: parsed.data,
-    });
+    const { data: project } = await db
+      .from("projects")
+      .insert(parsed.data)
+      .select()
+      .single();
 
     return NextResponse.json(project, { status: 201 });
   } catch (error) {

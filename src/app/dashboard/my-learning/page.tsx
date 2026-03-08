@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { getUser } from "@/lib/supabase/server";
-import prisma from "@/lib/prisma";
+import { createServerSupabaseClient, getUser } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 import { BookOpen, PlayCircle, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,40 +19,39 @@ export default async function MyLearningPage() {
   const user = await getUser();
   if (!user) redirect("/login");
 
-  const purchases = await prisma.purchase.findMany({
-    where: {
-      userId: user.id,
-      courseId: { not: null },
-      status: "completed",
-    },
-    include: {
-      course: {
-        include: {
-          lessons: {
-            orderBy: { order: "asc" },
-          },
-        },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const supabase = await createServerSupabaseClient();
 
-  const lessonProgress = await prisma.lessonProgress.findMany({
-    where: { userId: user.id },
-  });
+  const { data: purchases } = await supabase
+    .from("purchases")
+    .select(`
+      id, amount, created_at, course_id,
+      courses(id, title, slug, thumbnail, category, difficulty,
+        lessons(id, title, video_url, duration, "order", is_free)
+      )
+    `)
+    .eq("user_id", user.id)
+    .not("course_id", "is", null)
+    .eq("status", "completed")
+    .order("created_at", { ascending: false });
 
-  type LPRow = { lessonId: string; completed: boolean; createdAt: Date };
+  const { data: lessonProgress } = await supabase
+    .from("lesson_progress")
+    .select("lesson_id, completed, created_at")
+    .eq("user_id", user.id);
+
+  type LPRow = { lesson_id: string; completed: boolean; created_at: string };
   const completedLessonIds = new Set(
-    lessonProgress.filter((lp: LPRow) => lp.completed).map((lp: LPRow) => lp.lessonId)
+    (lessonProgress ?? []).filter((lp: LPRow) => lp.completed).map((lp: LPRow) => lp.lesson_id)
   );
 
   // Build course cards with progress
-  type PurchaseRow = typeof purchases[number];
-  type LessonRow = { id: string; title: string; videoUrl: string; duration: number; order: number; isFree: boolean };
-  const courses = purchases
-    .filter((p: PurchaseRow) => p.course)
-    .map((p: PurchaseRow) => {
-      const course = p.course!;
+  type LessonRow = { id: string; title: string; video_url: string; duration: number; order: number; is_free: boolean };
+  const courses = (purchases ?? [])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .filter((p: any) => p.courses)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((p: any) => {
+      const course = p.courses;
       const lessons: LessonRow[] = course.lessons || [];
       const totalLessons = lessons.length;
       const completedLessons = lessons.filter((l: LessonRow) =>
@@ -66,11 +64,11 @@ export default async function MyLearningPage() {
       const totalDuration = lessons.reduce((sum: number, l: LessonRow) => sum + l.duration, 0);
 
       // Find last-accessed lesson
-      const lastProgress = lessonProgress
-        .filter((lp: LPRow) => lessons.some((l: LessonRow) => l.id === lp.lessonId))
+      const lastProgress = (lessonProgress ?? [])
+        .filter((lp: LPRow) => lessons.some((l: LessonRow) => l.id === lp.lesson_id))
         .sort(
           (a: LPRow, b: LPRow) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )[0];
 
       return {
@@ -84,8 +82,8 @@ export default async function MyLearningPage() {
         completedLessons,
         progress,
         totalDuration,
-        purchasedAt: p.createdAt,
-        lastAccessed: lastProgress?.createdAt || p.createdAt,
+        purchasedAt: p.created_at,
+        lastAccessed: lastProgress?.created_at || p.created_at,
       };
     });
 

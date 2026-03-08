@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import prisma from "@/lib/prisma";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { UserPlus, GraduationCap, Mail, Phone, MapPin } from "lucide-react";
@@ -18,46 +18,62 @@ export default async function AdminLeadsPage({
   try {
   const searchParams = await searchParamsPromise;
   const search = searchParams.search || "";
+  const db = createAdminSupabaseClient();
 
-  const leads = await prisma.preCheckoutLead.findMany({
-    where: search
-      ? {
-          OR: [
-            { name: { contains: search, mode: "insensitive" } },
-            { email: { contains: search, mode: "insensitive" } },
-          ],
-        }
-      : {},
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
+  let query = db
+    .from("pre_checkout_leads")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (search) {
+    query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+  }
+
+  const { data: leads } = await query;
+  const allLeads = leads ?? [];
 
   // Check which leads converted (have a matching purchase by email)
-  const leadEmails = leads.map((l) => l.email);
-  const purchasedEmails = await prisma.purchase.findMany({
-    where: {
-      profile: { email: { in: leadEmails } },
-      status: "completed",
-    },
-    select: { profile: { select: { email: true } } },
-  });
+  const leadEmails = allLeads.map((l: { email: string }) => l.email);
+  // Get profiles that match lead emails, then check if they have completed purchases
+  const { data: matchingProfiles } = await db
+    .from("profiles")
+    .select("email, user_id")
+    .in("email", leadEmails.length > 0 ? leadEmails : ["__none__"]);
+
+  const profileUserIds = (matchingProfiles ?? []).map((p: { user_id: string }) => p.user_id);
+  const emailByUserId: Record<string, string> = {};
+  for (const p of matchingProfiles ?? []) {
+    emailByUserId[p.user_id] = p.email;
+  }
+
+  const { data: completedPurchases } = await db
+    .from("purchases")
+    .select("user_id")
+    .eq("status", "completed")
+    .in("user_id", profileUserIds.length > 0 ? profileUserIds : ["__none__"]);
+
   const convertedEmails = new Set(
-    purchasedEmails
-      .filter((p) => p.profile !== null)
-      .map((p) => p.profile!.email)
+    (completedPurchases ?? [])
+      .filter((p: { user_id: string | null }) => p.user_id && emailByUserId[p.user_id])
+      .map((p: { user_id: string }) => emailByUserId[p.user_id])
   );
 
-  const totalLeads = await prisma.preCheckoutLead.count();
-  const studentLeads = leads.filter((l) => l.selfDeclaredStudent).length;
-  const convertedCount = leads.filter((l) => convertedEmails.has(l.email)).length;
-  const conversionRate = totalLeads > 0 ? ((convertedCount / leads.length) * 100).toFixed(1) : "0";
+  const { count: totalLeads } = await db
+    .from("pre_checkout_leads")
+    .select("*", { count: "exact", head: true });
+
+  const studentLeads = allLeads.filter((l: { self_declared_student: boolean }) => l.self_declared_student).length;
+  const convertedCount = allLeads.filter((l: { email: string }) => convertedEmails.has(l.email)).length;
+  const total = totalLeads ?? 0;
+  const conversionRate = total > 0 ? ((convertedCount / allLeads.length) * 100).toFixed(1) : "0";
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Pre-Checkout Leads</h1>
-          <p className="text-muted">{totalLeads} total leads collected</p>
+          <p className="text-muted">{total} total leads collected</p>
         </div>
       </div>
 
@@ -65,7 +81,7 @@ export default async function AdminLeadsPage({
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-surface/30 border border-white/10 rounded-xl p-4">
           <p className="text-muted text-sm">Total Leads</p>
-          <p className="text-2xl font-bold text-white">{totalLeads}</p>
+          <p className="text-2xl font-bold text-white">{total}</p>
         </div>
         <div className="bg-surface/30 border border-white/10 rounded-xl p-4">
           <p className="text-muted text-sm">Student Leads</p>
@@ -108,7 +124,8 @@ export default async function AdminLeadsPage({
               </tr>
             </thead>
             <tbody>
-              {leads.map((lead) => (
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {allLeads.map((lead: any) => (
                 <tr
                   key={lead.id}
                   className="border-b border-white/5 hover:bg-white/5 transition-colors"
@@ -132,13 +149,13 @@ export default async function AdminLeadsPage({
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <Badge variant="outline">{lead.productType}</Badge>
+                    <Badge variant="outline">{lead.product_type}</Badge>
                     <p className="text-xs text-muted mt-1 truncate max-w-[120px]">
-                      {lead.productId}
+                      {lead.product_id}
                     </p>
                   </td>
                   <td className="px-4 py-3">
-                    {lead.selfDeclaredStudent ? (
+                    {lead.self_declared_student ? (
                       <Badge variant="secondary">
                         <GraduationCap className="h-3 w-3 mr-1" />
                         Student
@@ -155,11 +172,11 @@ export default async function AdminLeadsPage({
                     )}
                   </td>
                   <td className="px-4 py-3 text-muted text-sm">
-                    {formatDate(lead.createdAt)}
+                    {formatDate(lead.created_at)}
                   </td>
                 </tr>
               ))}
-              {leads.length === 0 && (
+              {allLeads.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-muted">
                     <UserPlus className="h-12 w-12 mx-auto mb-3 opacity-50" />

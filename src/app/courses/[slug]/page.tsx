@@ -18,24 +18,10 @@ import { Button } from "@/components/ui/button";
 import { CourseCurriculum } from "@/components/courses/course-curriculum";
 import { CourseReviews } from "@/components/courses/course-reviews";
 import { CourseCard } from "@/components/courses/course-card";
-import { getUser } from "@/lib/supabase/server";
-import prisma from "@/lib/prisma";
+import { getUser, createServerSupabaseClient } from "@/lib/supabase/server";
 import { formatPrice } from "@/lib/utils";
 
 export const revalidate = 60;
-
-type CourseWithRelations = Awaited<ReturnType<typeof getCourseWithRelations>>;
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function getCourseWithRelations(slug: string) {
-  return prisma.course.findUnique({
-    where: { slug },
-    include: { lessons: true, reviews: true },
-  });
-}
-
-type ReviewItem = NonNullable<CourseWithRelations>["reviews"][number];
-type CourseItem = Awaited<ReturnType<typeof prisma.course.findMany>>[number];
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -46,20 +32,23 @@ export async function generateMetadata({
 }: PageProps): Promise<Metadata> {
   const params = await paramsPromise;
   try {
-    const course = await prisma.course.findUnique({
-      where: { slug: params.slug },
-    });
+    const supabase = await createServerSupabaseClient();
+    const { data: course } = await supabase
+      .from("courses")
+      .select("title, short_desc, description, thumbnail, is_published")
+      .eq("slug", params.slug)
+      .single();
 
-    if (!course || !course.isPublished) {
+    if (!course || !course.is_published) {
       return { title: "Course Not Found | Code Hunters" };
     }
 
     return {
       title: `${course.title} | Code Hunters`,
-      description: course.shortDesc || course.description,
+      description: course.short_desc || course.description,
       openGraph: {
         title: `${course.title} | Code Hunters`,
-        description: course.shortDesc || course.description,
+        description: course.short_desc || course.description,
         images: course.thumbnail ? [{ url: course.thumbnail }] : [],
       },
     };
@@ -79,26 +68,23 @@ function formatTotalDuration(seconds: number) {
 
 export default async function CourseDetailPage({ params: paramsPromise }: PageProps) {
   const params = await paramsPromise;
-  let course;
-  try {
-    course = await prisma.course.findUnique({
-      where: { slug: params.slug },
-      include: {
-        lessons: {
-          orderBy: { order: "asc" },
-        },
-        reviews: {
-          orderBy: { createdAt: "desc" },
-        },
-      },
-    });
-  } catch {
+  const supabase = await createServerSupabaseClient();
+
+  const { data: course } = await supabase
+    .from("courses")
+    .select("*, lessons(*), reviews(*)")
+    .eq("slug", params.slug)
+    .single();
+
+  if (!course || !course.is_published) {
     notFound();
   }
 
-  if (!course || !course.isPublished) {
-    notFound();
-  }
+  // Sort lessons by order, reviews by created_at desc
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lessons = (course.lessons ?? []).sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const reviews = (course.reviews ?? []).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   // Auth + purchase check
   let userData = null;
@@ -107,26 +93,28 @@ export default async function CourseDetailPage({ params: paramsPromise }: PagePr
   try {
     const user = await getUser();
     if (user) {
-      const profile = await prisma.profile.findUnique({
-        where: { userId: user.id },
-      });
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("name, role, gold_coins")
+        .eq("user_id", user.id)
+        .single();
       if (profile) {
         userData = {
           id: user.id,
           email: user.email || "",
           name: profile.name,
           role: profile.role,
-          goldCoins: profile.goldCoins,
+          goldCoins: profile.gold_coins,
         };
       }
 
-      const purchase = await prisma.purchase.findFirst({
-        where: {
-          userId: user.id,
-          courseId: course.id,
-          status: "paid",
-        },
-      });
+      const { data: purchase } = await supabase
+        .from("purchases")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("course_id", course.id)
+        .eq("status", "completed")
+        .maybeSingle();
       hasPurchased = !!purchase;
     }
   } catch {
@@ -134,22 +122,20 @@ export default async function CourseDetailPage({ params: paramsPromise }: PagePr
   }
 
   // Related courses (same category, exclude current)
-  let relatedCourses: CourseItem[] = [];
-  try {
-    relatedCourses = await prisma.course.findMany({
-      where: {
-        isPublished: true,
-        category: course.category,
-        id: { not: course.id },
-      },
-      take: 3,
-      orderBy: { purchasesCount: "desc" },
-    });
-  } catch {
-    // Database unavailable — skip related courses
-  }
+  const { data: relatedCourses } = await supabase
+    .from("courses")
+    .select("*")
+    .eq("is_published", true)
+    .eq("category", course.category)
+    .neq("id", course.id)
+    .order("purchases_count", { ascending: false })
+    .limit(3);
 
-  const totalDuration = course.lessons.reduce((a: number, l: { duration: number }) => a + l.duration, 0);
+  const safeRelated = relatedCourses ?? [];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const totalDuration = lessons.reduce((a: number, l: any) => a + (l.duration ?? 0), 0);
+  const techTags: string[] = course.tech_tags ?? [];
   const hasSale = course.price < course.mrp;
   const discountPercent = hasSale
     ? Math.round(((course.mrp - course.price) / course.mrp) * 100)
@@ -177,7 +163,7 @@ export default async function CourseDetailPage({ params: paramsPromise }: PagePr
               <div className="mb-4 flex flex-wrap gap-2">
                 <Badge variant="default">{course.category}</Badge>
                 <Badge variant="secondary">{course.difficulty}</Badge>
-                {course.isBestseller && (
+                {course.is_bestseller && (
                   <Badge variant="bestseller">Bestseller</Badge>
                 )}
               </div>
@@ -193,19 +179,19 @@ export default async function CourseDetailPage({ params: paramsPromise }: PagePr
                     {course.rating.toFixed(1)}
                   </span>
                   <span>
-                    ({course.reviewCount}{" "}
-                    {course.reviewCount === 1 ? "review" : "reviews"})
+                    ({course.review_count}{" "}
+                    {course.review_count === 1 ? "review" : "reviews"})
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Users className="h-4 w-4" />
                   <span>
-                    {course.purchasesCount.toLocaleString()} students
+                    {course.purchases_count.toLocaleString()} students
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
                   <BookOpen className="h-4 w-4" />
-                  <span>{course.lessons.length} lessons</span>
+                  <span>{lessons.length} lessons</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Clock className="h-4 w-4" />
@@ -213,11 +199,11 @@ export default async function CourseDetailPage({ params: paramsPromise }: PagePr
                 </div>
               </div>
 
-              {course.instructorName && (
+              {course.instructor_name && (
                 <p className="mt-3 text-sm text-muted">
                   Instructor:{" "}
                   <span className="text-white font-medium">
-                    {course.instructorName}
+                    {course.instructor_name}
                   </span>
                 </p>
               )}
@@ -228,26 +214,27 @@ export default async function CourseDetailPage({ params: paramsPromise }: PagePr
               <h2 className="text-xl font-bold text-white">About this Course</h2>
               <div className="prose prose-invert max-w-none text-muted leading-relaxed">
                 <p>{course.description}</p>
-                {course.shortDesc && (
-                  <p className="mt-3">{course.shortDesc}</p>
+                {course.short_desc && (
+                  <p className="mt-3">{course.short_desc}</p>
                 )}
               </div>
             </div>
 
             {/* Curriculum */}
             <CourseCurriculum
-              lessons={course.lessons}
+              lessons={lessons}
               hasPurchased={hasPurchased}
             />
 
             {/* Reviews */}
             <CourseReviews
-              reviews={course.reviews.map((r: ReviewItem) => ({
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              reviews={reviews.map((r: any) => ({
                 ...r,
-                createdAt: r.createdAt.toISOString(),
+                createdAt: r.created_at,
               }))}
               averageRating={course.rating}
-              totalReviews={course.reviewCount}
+              totalReviews={course.review_count}
               hasPurchased={hasPurchased}
             />
           </div>
@@ -272,7 +259,7 @@ export default async function CourseDetailPage({ params: paramsPromise }: PagePr
                       <PlayCircle className="h-16 w-16 text-white/40" />
                     </div>
                   )}
-                  {course.previewVideoUrl && (
+                  {course.preview_video_url && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/30">
                       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/90 shadow-lg shadow-primary/30">
                         <PlayCircle className="h-7 w-7 text-white" />
@@ -324,7 +311,7 @@ export default async function CourseDetailPage({ params: paramsPromise }: PagePr
                     <div className="flex justify-between">
                       <span className="text-muted">Lessons</span>
                       <span className="text-white font-medium">
-                        {course.lessons.length}
+                        {lessons.length}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -336,7 +323,7 @@ export default async function CourseDetailPage({ params: paramsPromise }: PagePr
                     <div className="flex justify-between">
                       <span className="text-muted">Students</span>
                       <span className="text-white font-medium">
-                        {course.purchasesCount.toLocaleString()}
+                        {course.purchases_count.toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -355,13 +342,13 @@ export default async function CourseDetailPage({ params: paramsPromise }: PagePr
                   </div>
 
                   {/* Tech Stack */}
-                  {course.techTags.length > 0 && (
+                  {techTags.length > 0 && (
                     <div className="border-t border-white/5 pt-5">
                       <h4 className="mb-3 text-sm font-semibold text-white">
                         Tech Stack
                       </h4>
                       <div className="flex flex-wrap gap-1.5">
-                        {course.techTags.map((tag: string) => (
+                        {techTags.map((tag: string) => (
                           <Badge
                             key={tag}
                             variant="outline"
@@ -391,13 +378,14 @@ export default async function CourseDetailPage({ params: paramsPromise }: PagePr
         </div>
 
         {/* Related Courses */}
-        {relatedCourses.length > 0 && (
+        {safeRelated.length > 0 && (
           <section className="mt-20">
             <h2 className="mb-6 text-2xl font-bold text-white">
               Related <span className="text-primary">Courses</span>
             </h2>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {relatedCourses.map((rc: CourseItem, idx: number) => (
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {safeRelated.map((rc: any, idx: number) => (
                 <CourseCard key={rc.id} course={rc} index={idx} />
               ))}
             </div>

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { getUser } from "@/lib/supabase/server";
+import { getUser, createAdminSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = 'force-dynamic';
 
@@ -11,113 +10,110 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const profile = await prisma.profile.findUnique({
-      where: { userId: user.id },
-    });
-    if (profile?.role !== "admin") {
+    const db = createAdminSupabaseClient();
+
+    const { data: profile } = await db
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profile?.role !== "admin" && profile?.role !== "owner") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Total revenue (completed purchases, amount is in paise)
-    const revenueAgg = await prisma.purchase.aggregate({
-      where: { status: "completed" },
-      _sum: { amount: true },
-    });
-    const totalRevenue = revenueAgg._sum.amount ?? 0;
+    // Fetch all completed purchases with joins
+    const { data: allPurchases } = await db
+      .from("purchases")
+      .select("id, amount, user_id, course_id, project_id, created_at, profiles(name, email), courses(title, slug), projects(title)")
+      .eq("status", "completed")
+      .order("created_at", { ascending: false });
+
+    const purchases = allPurchases ?? [];
+
+    // Total revenue
+    const totalRevenue = purchases.reduce((sum: number, p: { amount: number }) => sum + (p.amount ?? 0), 0);
 
     // Total distinct students
-    const totalStudents = await prisma.purchase.groupBy({
-      by: ["userId"],
-      where: { status: "completed", userId: { not: null } },
-    });
+    const studentSet = new Set(purchases.filter((p: { user_id: string | null }) => p.user_id).map((p: { user_id: string }) => p.user_id));
+    const totalStudents = studentSet.size;
 
     // Total courses and projects
-    const [totalCourses, totalProjects] = await Promise.all([
-      prisma.course.count(),
-      prisma.project.count(),
+    const [{ count: totalCourses }, { count: totalProjects }] = await Promise.all([
+      db.from("courses").select("*", { count: "exact", head: true }),
+      db.from("projects").select("*", { count: "exact", head: true }),
     ]);
 
     // Recent purchases (last 10)
-    const recentPurchases = await prisma.purchase.findMany({
-      where: { status: "completed" },
-      orderBy: { createdAt: "desc" },
-      take: 10,
-      include: {
-        profile: { select: { name: true, email: true } },
-        course: { select: { title: true } },
-        project: { select: { title: true } },
-      },
-    });
+    const recentPurchases = purchases.slice(0, 10).map((p: Record<string, unknown>) => ({
+      ...p,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      profile: p.profiles as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      course: p.courses as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      project: p.projects as any,
+    }));
 
     // Revenue by month (last 6 months)
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-    const monthlyPurchases = await prisma.purchase.findMany({
-      where: {
-        status: "completed",
-        createdAt: { gte: sixMonthsAgo },
-      },
-      select: { amount: true, createdAt: true },
-    });
-
     const revenueByMonth: Record<string, number> = {};
-    for (const p of monthlyPurchases) {
-      const key = `${p.createdAt.getFullYear()}-${String(
-        p.createdAt.getMonth() + 1
-      ).padStart(2, "0")}`;
-      revenueByMonth[key] = (revenueByMonth[key] ?? 0) + p.amount;
+    for (const p of purchases) {
+      const d = new Date(p.created_at);
+      if (d >= sixMonthsAgo) {
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        revenueByMonth[key] = (revenueByMonth[key] ?? 0) + (p.amount ?? 0);
+      }
     }
 
     // Top courses by revenue
-    const topCourses = await prisma.purchase.groupBy({
-      by: ["courseId"],
-      where: { status: "completed", courseId: { not: null } },
-      _sum: { amount: true },
-      _count: { id: true },
-      orderBy: { _sum: { amount: "desc" } },
-      take: 5,
-    });
-
-    const topCourseDetails = await Promise.all(
-      topCourses.map(async (tc: { courseId: string | null; _sum: { amount: number | null }; _count: { id: number } }) => {
-        const course = tc.courseId
-          ? await prisma.course.findUnique({
-              where: { id: tc.courseId },
-              select: { title: true, slug: true },
-            })
-          : null;
-        return {
-          courseId: tc.courseId,
-          title: course?.title ?? "Unknown",
-          slug: course?.slug,
-          revenue: tc._sum.amount ?? 0,
-          purchases: tc._count.id,
-        };
-      })
-    );
+    const courseRevMap: Record<string, { revenue: number; count: number; title: string; slug: string | null }> = {};
+    for (const p of purchases) {
+      if (p.course_id) {
+        if (!courseRevMap[p.course_id]) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const c = p.courses as any;
+          courseRevMap[p.course_id] = { revenue: 0, count: 0, title: c?.title ?? "Unknown", slug: c?.slug ?? null };
+        }
+        courseRevMap[p.course_id].revenue += p.amount ?? 0;
+        courseRevMap[p.course_id].count++;
+      }
+    }
+    const topCourses = Object.entries(courseRevMap)
+      .sort(([, a], [, b]) => b.revenue - a.revenue)
+      .slice(0, 5)
+      .map(([courseId, info]) => ({
+        courseId,
+        title: info.title,
+        slug: info.slug,
+        revenue: info.revenue,
+        purchases: info.count,
+      }));
 
     // Conversion rate
-    const [totalLeads, totalCompletedPurchases] = await Promise.all([
-      prisma.preCheckoutLead.count(),
-      prisma.purchase.count({ where: { status: "completed" } }),
-    ]);
+    const { count: totalLeads } = await db
+      .from("pre_checkout_leads")
+      .select("*", { count: "exact", head: true });
+
+    const totalCompletedPurchases = purchases.length;
 
     const conversionRate =
-      totalLeads > 0
-        ? Math.round((totalCompletedPurchases / totalLeads) * 10000) / 100
+      (totalLeads ?? 0) > 0
+        ? Math.round((totalCompletedPurchases / (totalLeads ?? 1)) * 10000) / 100
         : 0;
 
     return NextResponse.json({
       totalRevenue,
-      totalStudents: totalStudents.length,
-      totalCourses,
-      totalProjects,
+      totalStudents,
+      totalCourses: totalCourses ?? 0,
+      totalProjects: totalProjects ?? 0,
       recentPurchases,
       revenueByMonth,
-      topCourses: topCourseDetails,
+      topCourses,
       conversionRate,
-      totalLeads,
+      totalLeads: totalLeads ?? 0,
       totalCompletedPurchases,
     });
   } catch (error) {

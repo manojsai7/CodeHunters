@@ -5,12 +5,9 @@ import { Footer } from "@/components/layout/footer";
 import { CourseFilters } from "@/components/courses/course-filters";
 import { CourseCard } from "@/components/courses/course-card";
 
-import { getUser } from "@/lib/supabase/server";
-import prisma from "@/lib/prisma";
+import { getUser, createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const revalidate = 30;
-
-type CourseItem = Awaited<ReturnType<typeof prisma.course.findMany>>[number];
 
 export const metadata: Metadata = {
   title: "Courses | Code Hunters",
@@ -34,21 +31,25 @@ interface PageProps {
 
 export default async function CoursesPage({ searchParams: searchParamsPromise }: PageProps) {
   const searchParams = await searchParamsPromise;
+  const supabase = await createServerSupabaseClient();
+
   // Auth
   let userData = null;
   try {
     const user = await getUser();
     if (user) {
-      const profile = await prisma.profile.findUnique({
-        where: { userId: user.id },
-      });
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("name, role, gold_coins")
+        .eq("user_id", user.id)
+        .single();
       if (profile) {
         userData = {
           id: user.id,
           email: user.email || "",
           name: profile.name,
           role: profile.role,
-          goldCoins: profile.goldCoins,
+          goldCoins: profile.gold_coins,
         };
       }
     }
@@ -56,65 +57,39 @@ export default async function CoursesPage({ searchParams: searchParamsPromise }:
     // Not authenticated
   }
 
-  // Build where clause
-  const where: Record<string, unknown> = { isPublished: true };
-  if (searchParams.category) where.category = searchParams.category;
-  if (searchParams.difficulty) where.difficulty = searchParams.difficulty;
+  // Build Supabase query
+  let query = supabase
+    .from("courses")
+    .select("id, slug, title, description, short_desc, price, mrp, thumbnail, category, difficulty, tech_tags, purchases_count, rating, review_count, is_bestseller, instructor_name, preview_video_url")
+    .eq("is_published", true)
+    .limit(50);
+
+  if (searchParams.category) query = query.eq("category", searchParams.category);
+  if (searchParams.difficulty) query = query.eq("difficulty", searchParams.difficulty);
   if (searchParams.search) {
-    where.OR = [
-      { title: { contains: searchParams.search, mode: "insensitive" } },
-      { description: { contains: searchParams.search, mode: "insensitive" } },
-    ];
+    query = query.or(`title.ilike.%${searchParams.search}%,description.ilike.%${searchParams.search}%`);
   }
 
-  // Build orderBy
-  let orderBy: Record<string, string> = { createdAt: "desc" };
+  // Sort
   switch (searchParams.sort) {
     case "price-low":
-      orderBy = { price: "asc" };
+      query = query.order("price", { ascending: true });
       break;
     case "price-high":
-      orderBy = { price: "desc" };
+      query = query.order("price", { ascending: false });
       break;
     case "rating":
-      orderBy = { rating: "desc" };
+      query = query.order("rating", { ascending: false });
       break;
     case "popular":
-      orderBy = { purchasesCount: "desc" };
+      query = query.order("purchases_count", { ascending: false });
       break;
     default:
-      orderBy = { createdAt: "desc" };
+      query = query.order("created_at", { ascending: false });
   }
 
-  let courses: CourseItem[] = [];
-  try {
-    courses = await prisma.course.findMany({
-      where,
-      orderBy,
-      take: 50,
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        description: true,
-        shortDesc: true,
-        price: true,
-        mrp: true,
-        thumbnail: true,
-        category: true,
-        difficulty: true,
-        techTags: true,
-        purchasesCount: true,
-        rating: true,
-        reviewCount: true,
-        isBestseller: true,
-        instructorName: true,
-        previewVideoUrl: true,
-      },
-    }) as CourseItem[];
-  } catch {
-    // Database unavailable — render with empty list
-  }
+  const { data: courses } = await query;
+  const safeCourses = courses ?? [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -140,13 +115,14 @@ export default async function CoursesPage({ searchParams: searchParamsPromise }:
 
         {/* Results count */}
         <p className="mb-6 text-sm text-muted">
-          {courses.length} {courses.length === 1 ? "course" : "courses"} found
+          {safeCourses.length} {safeCourses.length === 1 ? "course" : "courses"} found
         </p>
 
         {/* Course Grid */}
-        {courses.length > 0 ? (
+        {safeCourses.length > 0 ? (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {courses.map((course: CourseItem, idx: number) => (
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {safeCourses.map((course: any, idx: number) => (
               <CourseCard key={course.id} course={course} index={idx} />
             ))}
           </div>

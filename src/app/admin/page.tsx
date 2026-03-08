@@ -1,5 +1,5 @@
 import { DollarSign, GraduationCap, BookOpen, FolderOpen } from "lucide-react";
-import prisma from "@/lib/prisma";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { StatsCard } from "@/components/admin/stats-card";
 import { Badge } from "@/components/ui/badge";
@@ -13,50 +13,42 @@ export const metadata = {
 
 export default async function AdminDashboardPage() {
   try {
-  // Fetch stats inline for server component
-  const revenueAgg = await prisma.purchase.aggregate({
-    where: { status: "completed" },
-    _sum: { amount: true },
-  });
-  const totalRevenue = revenueAgg._sum.amount ?? 0;
+  const db = createAdminSupabaseClient();
 
-  const totalStudentsGroup = await prisma.purchase.groupBy({
-    by: ["userId"],
-    where: { status: "completed", userId: { not: null } },
-  });
-  const totalStudents = totalStudentsGroup.length;
+  // Fetch all completed purchases for aggregation
+  const { data: completedPurchases } = await db
+    .from("purchases")
+    .select("id, user_id, course_id, amount, created_at, profiles(name, email), courses(title), projects(title)")
+    .eq("status", "completed")
+    .order("created_at", { ascending: false });
 
-  const [totalCourses, totalProjects] = await Promise.all([
-    prisma.course.count(),
-    prisma.project.count(),
+  const allCompleted = completedPurchases ?? [];
+  const totalRevenue = allCompleted.reduce((sum, p) => sum + (p.amount ?? 0), 0);
+  const totalStudents = new Set(allCompleted.filter(p => p.user_id).map(p => p.user_id)).size;
+
+  const [{ count: totalCourses }, { count: totalProjects }] = await Promise.all([
+    db.from("courses").select("*", { count: "exact", head: true }),
+    db.from("projects").select("*", { count: "exact", head: true }),
   ]);
 
-  // Recent purchases
-  const recentPurchases = await prisma.purchase.findMany({
-    where: { status: "completed" },
-    orderBy: { createdAt: "desc" },
-    take: 10,
-    include: {
-      profile: { select: { name: true, email: true } },
-      course: { select: { title: true } },
-      project: { select: { title: true } },
-    },
-  });
+  // Recent purchases (first 10 from already sorted list)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recentPurchases = allCompleted.slice(0, 10).map((p: any) => ({
+    ...p,
+    profile: p.profiles,
+    course: p.courses,
+    project: p.projects,
+  }));
 
   // Revenue by month (last 6 months)
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-  const monthlyPurchases = await prisma.purchase.findMany({
-    where: { status: "completed", createdAt: { gte: sixMonthsAgo } },
-    select: { amount: true, createdAt: true },
-  });
-
   const revenueByMonth: Record<string, number> = {};
-  for (const p of monthlyPurchases) {
-    const key = `${p.createdAt.getFullYear()}-${String(
-      p.createdAt.getMonth() + 1
-    ).padStart(2, "0")}`;
+  for (const p of allCompleted) {
+    const d = new Date(p.created_at);
+    if (d < sixMonthsAgo) continue;
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     revenueByMonth[key] = (revenueByMonth[key] ?? 0) + p.amount;
   }
 
@@ -70,45 +62,40 @@ export default async function AdminDashboardPage() {
       revenue,
     }));
 
-  // Top courses
-  const topCoursesAgg = await prisma.purchase.groupBy({
-    by: ["courseId"],
-    where: { status: "completed", courseId: { not: null } },
-    _sum: { amount: true },
-    _count: { id: true },
-    orderBy: { _sum: { amount: "desc" } },
-    take: 5,
-  });
+  // Top courses by revenue
+  const courseRevMap: Record<string, { revenue: number; count: number }> = {};
+  for (const p of allCompleted) {
+    if (!p.course_id) continue;
+    if (!courseRevMap[p.course_id]) courseRevMap[p.course_id] = { revenue: 0, count: 0 };
+    courseRevMap[p.course_id].revenue += p.amount ?? 0;
+    courseRevMap[p.course_id].count += 1;
+  }
+  const topCourseIds = Object.entries(courseRevMap)
+    .sort(([, a], [, b]) => b.revenue - a.revenue)
+    .slice(0, 5);
 
   const topCourses = await Promise.all(
-    topCoursesAgg.map(
-      async (tc: {
-        courseId: string | null;
-        _sum: { amount: number | null };
-        _count: { id: number };
-      }) => {
-        const course = tc.courseId
-          ? await prisma.course.findUnique({
-              where: { id: tc.courseId },
-              select: { title: true },
-            })
-          : null;
-        return {
-          title: course?.title ?? "Unknown",
-          revenue: tc._sum.amount ?? 0,
-          purchases: tc._count.id,
-        };
-      }
-    )
+    topCourseIds.map(async ([courseId, stats]) => {
+      const { data: course } = await db
+        .from("courses")
+        .select("title")
+        .eq("id", courseId)
+        .single();
+      return {
+        title: course?.title ?? "Unknown",
+        revenue: stats.revenue,
+        purchases: stats.count,
+      };
+    })
   );
 
   // Conversion
-  const [totalLeads, totalCompleted] = await Promise.all([
-    prisma.preCheckoutLead.count(),
-    prisma.purchase.count({ where: { status: "completed" } }),
-  ]);
+  const { count: totalLeads } = await db
+    .from("pre_checkout_leads")
+    .select("*", { count: "exact", head: true });
+  const totalCompleted = allCompleted.length;
   const conversionRate =
-    totalLeads > 0 ? Math.round((totalCompleted / totalLeads) * 10000) / 100 : 0;
+    (totalLeads ?? 0) > 0 ? Math.round((totalCompleted / (totalLeads ?? 1)) * 10000) / 100 : 0;
 
   return (
     <div className="space-y-8">
@@ -136,13 +123,13 @@ export default async function AdminDashboardPage() {
         />
         <StatsCard
           label="Courses"
-          value={totalCourses.toString()}
+          value={(totalCourses ?? 0).toString()}
           icon={BookOpen}
           iconColor="text-primary"
         />
         <StatsCard
           label="Projects"
-          value={totalProjects.toString()}
+          value={(totalProjects ?? 0).toString()}
           icon={FolderOpen}
           iconColor="text-gold"
         />
@@ -153,7 +140,7 @@ export default async function AdminDashboardPage() {
         monthlyData={monthlyData}
         topCourses={topCourses}
         conversionRate={conversionRate}
-        totalLeads={totalLeads}
+        totalLeads={totalLeads ?? 0}
         totalCompleted={totalCompleted}
       />
 
@@ -199,7 +186,7 @@ export default async function AdminDashboardPage() {
                     {formatPrice(p.amount)}
                   </td>
                   <td className="px-6 py-4 text-sm text-muted">
-                    {formatDate(p.createdAt)}
+                    {formatDate(p.created_at)}
                   </td>
                   <td className="px-6 py-4">
                     <Badge variant="success">Completed</Badge>

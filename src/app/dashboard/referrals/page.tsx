@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { getUser } from "@/lib/supabase/server";
-import prisma from "@/lib/prisma";
+import { getUser, createServerSupabaseClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 import {
   REFERRAL_COINS_PER_PURCHASE,
@@ -30,24 +29,35 @@ export default async function ReferralsPage() {
   const user = await getUser();
   if (!user) redirect("/login");
 
-  const profile = await prisma.profile.findUnique({
-    where: { userId: user.id },
-  });
+  const supabase = await createServerSupabaseClient();
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("user_id", user.id)
+    .single();
   if (!profile) redirect("/dashboard/my-learning");
 
-  const referrals = await prisma.referralUse.findMany({
-    where: { referrerId: user.id },
-    orderBy: { createdAt: "desc" },
-  });
+  const { data: referrals } = await supabase
+    .from("referral_uses")
+    .select("*")
+    .eq("referrer_id", user.id)
+    .order("created_at", { ascending: false });
 
   // Check for auto-generated coupons owned by this user
-  const coupons = await prisma.coupon.findMany({
-    where: { userId: user.id, isActive: true, source: "referral_reward" },
-    orderBy: { createdAt: "desc" },
-  });
+  const { data: coupons } = await supabase
+    .from("coupons")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .eq("source", "referral_reward")
+    .order("created_at", { ascending: false });
 
-  const shareUrl = `${SITE_CONFIG.url}/register?ref=${profile.referralCode}`;
-  const coinsToNextCoupon = COINS_FOR_COUPON_THRESHOLD - (profile.goldCoins % COINS_FOR_COUPON_THRESHOLD);
+  const safeReferrals = referrals ?? [];
+  const safeCoupons = coupons ?? [];
+
+  const shareUrl = `${SITE_CONFIG.url}/register?ref=${profile.referral_code}`;
+  const coinsToNextCoupon = COINS_FOR_COUPON_THRESHOLD - (profile.gold_coins % COINS_FOR_COUPON_THRESHOLD);
   const progressToNextCoupon = Math.round(
     ((COINS_FOR_COUPON_THRESHOLD - coinsToNextCoupon) / COINS_FOR_COUPON_THRESHOLD) * 100
   );
@@ -98,7 +108,7 @@ export default async function ReferralsPage() {
               <div>
                 <p className="text-sm text-gold/80">Your Gold Coins</p>
                 <p className="text-4xl font-bold text-gold">
-                  {profile.goldCoins}
+                  {profile.gold_coins}
                 </p>
               </div>
             </div>
@@ -136,21 +146,22 @@ export default async function ReferralsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <ReferralActions
-            referralCode={profile.referralCode}
+            referralCode={profile.referral_code}
             shareUrl={shareUrl}
           />
         </CardContent>
       </Card>
 
       {/* Available coupons */}
-      {coupons.length > 0 && (
+      {safeCoupons.length > 0 && (
         <section>
           <h2 className="mb-4 text-lg font-bold text-white flex items-center gap-2">
             <Ticket className="h-5 w-5 text-gold" />
             Your Reward Coupons
           </h2>
           <div className="grid gap-3 sm:grid-cols-2">
-            {coupons.map((coupon: typeof coupons[number]) => (
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {safeCoupons.map((coupon: any) => (
               <Card key={coupon.id} className="border-gold/20">
                 <CardContent className="flex items-center justify-between p-4">
                   <div>
@@ -159,7 +170,7 @@ export default async function ReferralsPage() {
                     </p>
                     <p className="text-xs text-muted">
                       {coupon.discount}% off • Expires{" "}
-                      {formatDate(coupon.expiresAt)}
+                      {formatDate(coupon.expires_at)}
                     </p>
                   </div>
                   <Badge variant="gold">Active</Badge>
@@ -198,7 +209,7 @@ export default async function ReferralsPage() {
           <Users className="h-5 w-5 text-secondary" />
           Referral History
         </h2>
-        {referrals.length > 0 ? (
+        {safeReferrals.length > 0 ? (
           <Card>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -220,26 +231,27 @@ export default async function ReferralsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {referrals.map((ref: typeof referrals[number]) => (
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                    {safeReferrals.map((ref: any) => (
                       <tr
                         key={ref.id}
                         className="hover:bg-surface-hover transition-colors"
                       >
                         <td className="px-5 py-3 font-medium text-white">
-                          {ref.referredName}
+                          {ref.referred_name}
                         </td>
                         <td className="px-5 py-3 text-muted">
-                          {formatDate(ref.createdAt)}
+                          {formatDate(ref.created_at)}
                         </td>
                         <td className="px-5 py-3">
-                          {ref.purchaseMade ? (
+                          {ref.purchase_made ? (
                             <Badge variant="success">Yes</Badge>
                           ) : (
                             <Badge variant="outline">Pending</Badge>
                           )}
                         </td>
                         <td className="px-5 py-3">
-                          {ref.coinsAwarded ? (
+                          {ref.coins_awarded ? (
                             <span className="flex items-center gap-1 text-gold font-medium">
                               <Coins className="h-3.5 w-3.5" />+
                               {REFERRAL_COINS_PER_PURCHASE}

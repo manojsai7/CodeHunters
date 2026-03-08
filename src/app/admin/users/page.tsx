@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import prisma from "@/lib/prisma";
+import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Shield, Search, Users, GraduationCap, Coins } from "lucide-react";
@@ -19,22 +19,24 @@ export default async function AdminUsersPage({
   const searchParams = await searchParamsPromise;
   const search = searchParams.search || "";
 
-  const users = await prisma.profile.findMany({
-    where: search
-      ? {
-          OR: [
-            { name: { contains: search, mode: "insensitive" } },
-            { email: { contains: search, mode: "insensitive" } },
-          ],
-        }
-      : {},
-    orderBy: { createdAt: "desc" },
-    include: {
-      _count: {
-        select: { purchases: true, referralsMade: true },
-      },
-    },
-  });
+  const db = createAdminSupabaseClient();
+
+  let query = db
+    .from("profiles")
+    .select("*, purchases(id), referral_uses!referral_uses_referrer_id_fkey(id)")
+    .order("created_at", { ascending: false });
+
+  if (search) {
+    query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+  }
+
+  const { data: rawUsers } = await query;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const users = (rawUsers ?? []).map((u: any) => ({
+    ...u,
+    purchaseCount: Array.isArray(u.purchases) ? u.purchases.length : 0,
+    referralCount: Array.isArray(u.referral_uses) ? u.referral_uses.length : 0,
+  }));
 
   return (
     <div className="space-y-6">
@@ -72,7 +74,7 @@ export default async function AdminUsersPage({
             <tbody>
               {users.map((user) => (
                 <tr
-                  key={user.userId}
+                  key={user.user_id}
                   className="border-b border-white/5 hover:bg-white/5 transition-colors"
                 >
                   <td className="px-4 py-3">
@@ -90,11 +92,11 @@ export default async function AdminUsersPage({
                   <td className="px-4 py-3">
                     <span className="flex items-center gap-1 text-gold">
                       <Coins className="h-4 w-4" />
-                      {user.goldCoins}
+                      {user.gold_coins}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {user.studentVerified ? (
+                    {user.student_verified ? (
                       <Badge variant="success">
                         <GraduationCap className="h-3 w-3 mr-1" />
                         Verified
@@ -104,13 +106,13 @@ export default async function AdminUsersPage({
                     )}
                   </td>
                   <td className="px-4 py-3 text-white">
-                    {user._count.purchases}
+                    {user.purchaseCount}
                   </td>
                   <td className="px-4 py-3 text-white">
-                    {user._count.referralsMade}
+                    {user.referralCount}
                   </td>
                   <td className="px-4 py-3 text-muted text-sm">
-                    {formatDate(user.createdAt)}
+                    {formatDate(user.created_at)}
                   </td>
                 </tr>
               ))}

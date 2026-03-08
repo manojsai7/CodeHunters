@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { getUser } from "@/lib/supabase/server";
+import { getUser, createAdminSupabaseClient } from "@/lib/supabase/server";
 import { courseSchema } from "@/lib/validations";
 
 export async function GET() {
@@ -9,22 +8,35 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const profile = await prisma.profile.findUnique({
-      where: { userId: user.id },
-    });
-    if (profile?.role !== "admin") {
+    const db = createAdminSupabaseClient();
+
+    const { data: profile } = await db
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profile?.role !== "admin" && profile?.role !== "owner") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const courses = await prisma.course.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 200,
-      include: {
-        _count: { select: { purchases: true, lessons: true, reviews: true } },
-      },
-    });
+    const { data: courses } = await db
+      .from("courses")
+      .select("*, purchases(id), lessons(id), reviews(id)")
+      .order("created_at", { ascending: false })
+      .limit(200);
 
-    return NextResponse.json(courses);
+    // Add _count for compatibility
+    const result = (courses ?? []).map((c: Record<string, unknown>) => ({
+      ...c,
+      _count: {
+        purchases: Array.isArray(c.purchases) ? (c.purchases as unknown[]).length : 0,
+        lessons: Array.isArray(c.lessons) ? (c.lessons as unknown[]).length : 0,
+        reviews: Array.isArray(c.reviews) ? (c.reviews as unknown[]).length : 0,
+      },
+    }));
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Admin list courses error:", error);
     return NextResponse.json(
@@ -40,10 +52,15 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const profile = await prisma.profile.findUnique({
-      where: { userId: user.id },
-    });
-    if (profile?.role !== "admin") {
+    const db = createAdminSupabaseClient();
+
+    const { data: profile } = await db
+      .from("profiles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profile?.role !== "admin" && profile?.role !== "owner") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -58,9 +75,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Check slug uniqueness
-    const existing = await prisma.course.findUnique({
-      where: { slug: parsed.data.slug },
-    });
+    const { data: existing } = await db
+      .from("courses")
+      .select("id")
+      .eq("slug", parsed.data.slug)
+      .maybeSingle();
 
     if (existing) {
       return NextResponse.json(
@@ -69,9 +88,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const course = await prisma.course.create({
-      data: parsed.data,
-    });
+    const { data: course } = await db
+      .from("courses")
+      .insert(parsed.data)
+      .select()
+      .single();
 
     return NextResponse.json(course, { status: 201 });
   } catch (error) {
